@@ -28,9 +28,25 @@ APPROVED = {
 }
 
 
+APPLICATION = {
+    "full_name": "Aisha Al Mansoori",
+    "emirates_id": "784-1990-1234567-1",
+    "family_size": 4,
+    "net_monthly_income_aed": "6000.00",
+    "employment_status": "EMPLOYED",
+}
+
+
 class FakeClient:
     response: dict | ApiError = APPROVED
     submitted: list[dict] = []
+
+    lookup_response: dict | ApiError = APPROVED
+
+    def lookup(self, reference_number: str, emirates_id: str) -> dict:
+        if isinstance(self.lookup_response, ApiError):
+            raise self.lookup_response
+        return self.lookup_response
 
     def submit(self, payload: dict) -> dict:
         FakeClient.submitted.append(payload)
@@ -43,6 +59,7 @@ class FakeClient:
 def app(monkeypatch) -> AppTest:
     st.cache_resource.clear()
     FakeClient.response, FakeClient.submitted = APPROVED, []
+    FakeClient.lookup_response = APPROVED | {"application": APPLICATION}
     monkeypatch.setattr(client_module, "ApiClient", FakeClient)
     return AppTest.from_file(str(APP), default_timeout=30).run()
 
@@ -89,3 +106,28 @@ def test_validation_errors_are_shown_per_field(app):
     app.button[0].click().run()
     assert not app.exception
     assert "Emirates ID must be 15 digits" in _texts(app)
+
+
+def _look_up(at: AppTest) -> None:
+    at.text_input(key="lookup_reference").input("SSA-7K2M9QXH4D")
+    at.text_input(key="lookup_emirates_id").input("784-1990-1234567-1")
+    next(b for b in at.button if b.label == "Look up").click().run()
+
+
+def test_lookup_shows_details_decision_and_rule_version(app):
+    _look_up(app)
+    assert not app.exception
+    text = _texts(app)
+    for fragment in (
+        "Aisha Al Mansoori",
+        "6000.00 AED",
+        "Approve",
+        "income-per-member/v0.1+3fa2c1d9",
+    ):
+        assert fragment in text
+
+
+def test_lookup_not_found_message(app):
+    FakeClient.lookup_response = ApiError(404, "No application found for the details provided.")
+    _look_up(app)
+    assert "No application found for the details provided." in _texts(app)

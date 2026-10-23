@@ -93,3 +93,24 @@ class SubmitApplicationResponse(BaseModel):
     submitted_at: str
     previous_application_exists: bool
     decision: DecisionOut
+
+
+class LookupRequest(BaseModel):
+    # Emirates ID is checked by the service, so any mismatch (including a malformed value)
+    # gets the same 404 as an unknown reference.
+    model_config = ConfigDict(extra="forbid")
+
+    reference_number: str
+    emirates_id: str
+
+
+class ApplicationOut(BaseModel):
+    full_name: str
+    emirates_id: str
+    family_size: int
+    net_monthly_income_aed: str
+    employment_status: str
+
+
+class LookupResponse(SubmitApplicationResponse):
+    application: ApplicationOut

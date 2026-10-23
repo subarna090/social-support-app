@@ -53,7 +53,16 @@ def _field_error(field: str) -> None:
         st.markdown(f":red[{message}]")
 
 
-def _show_decision(result: dict) -> None:
+def _lookup_application() -> None:
+    state = st.session_state
+    state.lookup_result, state.lookup_failure = None, None
+    try:
+        state.lookup_result = get_client().lookup(state.lookup_reference, state.lookup_emirates_id)
+    except ApiError as exc:
+        state.lookup_failure = exc.detail
+
+
+def _show_decision(result: dict, *, show_reference_hint: bool = True) -> None:
     decision = result["decision"]
     label, colour = OUTCOMES[decision["outcome"]]
     st.subheader("Recommendation")
@@ -62,10 +71,11 @@ def _show_decision(result: dict) -> None:
     if decision["suggested_next_steps"]:
         st.markdown("**Suggested next steps**")
         st.markdown("\n".join(f"- {step}" for step in decision["suggested_next_steps"]))
-    st.markdown(
-        f"Reference number: **{result['reference_number']}**. Keep it to look up this "
-        "application later."
-    )
+    if show_reference_hint:
+        st.markdown(
+            f"Reference number: **{result['reference_number']}**. Keep it to look up this "
+            "application later."
+        )
     if result["previous_application_exists"]:
         st.info("A previous application exists for this Emirates ID.")
 
@@ -104,7 +114,35 @@ def render_apply(client: ApiClient) -> None:
 
 
 def render_lookup(client: ApiClient) -> None:
-    st.info("Look up a previous application: coming in User Story 2.")
+    st.caption("Enter the reference number together with the applicant's Emirates ID.")
+    with st.form("lookup"):
+        st.text_input("Reference number", key="lookup_reference", placeholder="SSA-XXXXXXXXXX")
+        st.text_input("Emirates ID", key="lookup_emirates_id", placeholder="784-YYYY-NNNNNNN-N")
+        st.form_submit_button("Look up", on_click=_lookup_application)
+
+    if st.session_state.get("lookup_failure"):
+        st.error(st.session_state.lookup_failure)
+    result = st.session_state.get("lookup_result")
+    if result:
+        application = result["application"]
+        decision = result["decision"]
+        st.subheader(f"Application {result['reference_number']}")
+        st.markdown(
+            "\n".join(
+                [
+                    f"- **Name:** {application['full_name']}",
+                    f"- **Emirates ID:** {application['emirates_id']}",
+                    f"- **Family size:** {application['family_size']}",
+                    f"- **Net monthly household income:** "
+                    f"{application['net_monthly_income_aed']} AED",
+                    f"- **Employment status:** "
+                    f"{EMPLOYMENT_STATUSES[application['employment_status']]}",
+                    f"- **Submitted:** {result['submitted_at']}",
+                ]
+            )
+        )
+        _show_decision(result, show_reference_hint=False)
+        st.caption(f"Decided {decision['decided_at']} using rule {decision['rule_version']}.")
 
 
 def render_review(client: ApiClient) -> None:

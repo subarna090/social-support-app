@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 
 from sqlalchemy import exists, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from social_support.domain.models import RuleVersionInfo
 from social_support.persistence.orm import (
@@ -51,6 +51,14 @@ class ApplicationRepository:
     def emirates_id_has_applications(self, emirates_id: str) -> bool:
         return self.session.scalar(
             select(exists().where(ApplicationRow.emirates_id == emirates_id))
+        )
+
+    def get_by_reference(self, reference_number: str) -> ApplicationRow | None:
+        """The application with its decision loaded, or None."""
+        return self.session.scalar(
+            select(ApplicationRow)
+            .options(selectinload(ApplicationRow.decision))
+            .where(ApplicationRow.reference_number == reference_number)
         )
 
     def reference_exists(self, reference_number: str) -> bool:

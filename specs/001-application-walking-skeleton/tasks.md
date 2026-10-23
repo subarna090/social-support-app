@@ -340,12 +340,12 @@ same "not found" (quickstart steps 6–7).
 
 ### Tests for User Story 2 ⚠️ (write first; they must fail)
 
-- [ ] T033 [P] [US2] Write contract tests in `tests/contract/test_lookup_contract.py` for
+- [X] T033 [P] [US2] Write contract tests in `tests/contract/test_lookup_contract.py` for
   `POST /api/v1/applications/lookup`:
   - A `200` response has the `application` and `decision` blocks exactly as in contracts/api.md.
   - The `404` body is **byte-identical** for an unknown reference and for a mismatched Emirates ID:
     `{"detail": "No application found for the details provided."}`.
-- [ ] T034 [P] [US2] Write integration tests in `tests/integration/test_lookup_flow.py`:
+- [X] T034 [P] [US2] Write integration tests in `tests/integration/test_lookup_flow.py`:
   - Submit, then look up with the dashed and undashed forms of the ID. The decision, explanation,
     rule version and `decided_at` are identical to the submission response (SC-004).
   - A mismatched ID returns 404, and so does an unknown reference.
@@ -353,20 +353,20 @@ same "not found" (quickstart steps 6–7).
 
 ### Implementation for User Story 2
 
-- [ ] T035 [US2] Add `get_by_reference(ref)` to `src/social_support/persistence/repository.py`. It
+- [X] T035 [US2] Add `get_by_reference(ref)` to `src/social_support/persistence/repository.py`. It
   returns the application with its decision and rule version id, or `None`.
-- [ ] T036 [US2] Implement `ApplicationService.lookup(reference_number, emirates_id)` in
+- [X] T036 [US2] Implement `ApplicationService.lookup(reference_number, emirates_id)` in
   `src/social_support/services/applications.py`:
   - Normalise the ID.
   - Return `None` when the reference is unknown **or** the IDs don't match. Compare with
     `secrets.compare_digest`.
   - Log only the reference number and found / not found.
-- [ ] T037 [US2] Add `LookupRequest`, `ApplicationOut` and `LookupResponse` to
+- [X] T037 [US2] Add `LookupRequest`, `ApplicationOut` and `LookupResponse` to
   `src/social_support/api/schemas.py`. The response reuses `DecisionOut`.
-- [ ] T038 [US2] Implement the `POST /applications/lookup` route in
+- [X] T038 [US2] Implement the `POST /applications/lookup` route in
   `src/social_support/api/routes.py`. It returns `200 LookupResponse` or `404` with the single
   constant `NOT_FOUND_DETAIL`. T033 and T034 must pass.
-- [ ] T039 [US2] Add `lookup(reference_number, emirates_id)` to `src/social_support/ui/client.py`
+- [X] T039 [US2] Add `lookup(reference_number, emirates_id)` to `src/social_support/ui/client.py`
   and implement `render_lookup` in `src/social_support/ui/app.py`:
   - Inputs for the reference number and the Emirates ID.
   - Show the submitted details, outcome, explanation, next steps, decision time and rule version.

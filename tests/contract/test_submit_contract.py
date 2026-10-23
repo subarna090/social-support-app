@@ -2,8 +2,6 @@
 
 import re
 
-from fastapi.routing import APIRoute
-
 from tests.fixtures.synthetic_applications import valid_payload
 
 URL = "/api/v1/applications"
@@ -66,6 +64,8 @@ def test_protected_attribute_is_rejected(client):
 
 
 def test_no_update_or_delete_routes_for_applications(client):
-    for route in client.app.routes:
-        if isinstance(route, APIRoute) and route.path.startswith(URL):
-            assert not route.methods & {"PUT", "PATCH", "DELETE"}, route.path
+    # The OpenAPI schema lists every public endpoint (app.routes hides included routers).
+    paths = {p: ops for p, ops in client.app.openapi()["paths"].items() if p.startswith(URL)}
+    assert URL in paths  # guard against passing vacuously
+    for path, operations in paths.items():
+        assert not set(operations) & {"put", "patch", "delete"}, path

@@ -1,6 +1,7 @@
-"""Application use cases: submit (US1). Orchestrates assessment, persistence and tracing."""
+"""Application use cases: submit (US1) and lookup (US2)."""
 
 import logging
+import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -16,6 +17,7 @@ from social_support.domain.models import (
     TraceStatus,
     TraceStep,
 )
+from social_support.domain.validation import normalise_emirates_id
 from social_support.persistence.orm import ApplicationRow, DecisionRow, ProcessingTraceStepRow
 from social_support.persistence.repository import ApplicationRepository
 from social_support.services.reference import generate_reference
@@ -49,6 +51,12 @@ class SubmissionResult:
     previous_application_exists: bool
     assessment: AssessmentResult
     decided_at: datetime
+
+
+@dataclass(frozen=True)
+class LookupResult:
+    submission: Submission
+    result: SubmissionResult
 
 
 def _trace_row(record: TraceRecord) -> ProcessingTraceStepRow:
@@ -106,6 +114,46 @@ class ApplicationService:
             },
         )
         return SubmissionResult(reference, submitted_at, previous_exists, assessment, decided_at)
+
+    def lookup(self, reference_number: str, emirates_id: str) -> LookupResult | None:
+        """Return the application only if the reference exists AND the Emirates ID matches.
+
+        Both failure cases return None, so callers can't tell them apart (FR-011).
+        """
+        reference = reference_number.strip().upper()
+        row = self.repository.get_by_reference(reference)
+        given_id = normalise_emirates_id(emirates_id) or ""
+        stored_id = row.emirates_id if row else ""
+        matches = secrets.compare_digest(given_id.encode(), stored_id.encode())
+        if row is None or not given_id or not matches:
+            logger.info("application lookup", extra={"status": "not_found"})
+            return None
+
+        logger.info("application lookup", extra={"reference_number": reference, "status": "found"})
+        decision = row.decision
+        return LookupResult(
+            submission=Submission(
+                full_name=row.full_name,
+                emirates_id=row.emirates_id,
+                family_size=row.family_size,
+                net_monthly_income_aed=row.net_monthly_income_aed,
+                employment_status=EmploymentStatus(row.employment_status),
+            ),
+            result=SubmissionResult(
+                reference_number=row.reference_number,
+                submitted_at=row.submitted_at,
+                previous_application_exists=row.previous_application_exists,
+                assessment=AssessmentResult(
+                    outcome=Outcome(decision.outcome),
+                    income_per_member_aed=decision.income_per_member_aed,
+                    explanation=decision.explanation,
+                    suggested_next_steps=tuple(decision.suggested_next_steps),
+                    flag_reason=decision.flag_reason,
+                    rule_version_id=decision.rule_version_id,
+                ),
+                decided_at=decision.decided_at,
+            ),
+        )
 
     def _assess(
         self, submission: Submission, trace: TraceRecorder, reference: str
