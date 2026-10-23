@@ -29,23 +29,23 @@ tested on its own.
 
 **Purpose**: Project initialization and tooling
 
-- [ ] T001 Create `pyproject.toml` at the repo root:
+- [X] T001 Create `pyproject.toml` at the repo root:
   - Project name `social-support`, `src/` layout, package `social_support`,
     `requires-python = ">=3.12,<3.13"`.
   - Runtime dependencies: `fastapi`, `uvicorn[standard]`, `pydantic>=2`, `pydantic-settings`,
     `sqlalchemy>=2`, `streamlit`, `httpx`.
   - A `[dependency-groups] dev` group with `pytest` and `ruff`.
   - Also create `.python-version` containing `3.12`.
-- [ ] T002 Create the package and test skeleton from plan.md, with empty `__init__.py` files:
+- [X] T002 Create the package and test skeleton from plan.md, with empty `__init__.py` files:
   - `src/social_support/{domain,assessment,persistence,services,api,ui}/`
   - `tests/{unit,contract,integration,ui,fixtures}/`
-- [ ] T003 Add tool configuration to `pyproject.toml`:
+- [X] T003 Add tool configuration to `pyproject.toml`:
   - `[tool.ruff]`: line-length 100, target `py312`, lint rule sets `E,F,I,B,UP`.
   - `[tool.pytest.ini_options]`: `testpaths = ["tests"]`, `pythonpath = ["src"]`.
-- [ ] T004 [P] Create `.env.example` documenting `DATABASE_URL=sqlite:///./data/app.db`,
+- [X] T004 [P] Create `.env.example` documenting `DATABASE_URL=sqlite:///./data/app.db`,
   `CASEWORKER_PASSCODE=` (left empty), `ASSESSOR=income_rule`, `RULE_THRESHOLD_AED=2000`,
   `RULE_BAND_UPPER_AED=2500` and `API_BASE_URL=http://127.0.0.1:8000`. Add `data/` to `.gitignore`.
-- [ ] T005 Run `uv sync` to create `.venv` with Python 3.12 and generate `uv.lock`. Confirm that
+- [X] T005 Run `uv sync` to create `.venv` with Python 3.12 and generate `uv.lock`. Confirm that
   `uv run python -c "import social_support"` succeeds.
 
 ---
@@ -57,7 +57,7 @@ which every story depends on.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T006 [P] Implement `Settings` (pydantic-settings, reading `.env`) and a cached `get_settings()`
+- [X] T006 [P] Implement `Settings` (pydantic-settings, reading `.env`) and a cached `get_settings()`
   in `src/social_support/config.py`. Fields:
   - `database_url: str = "sqlite:///./data/app.db"`
   - `caseworker_passcode: SecretStr | None = None`
@@ -67,7 +67,7 @@ which every story depends on.
   - `api_base_url: str = "http://127.0.0.1:8000"`
 
   Add a validator that rejects `rule_band_upper_aed < rule_threshold_aed`.
-- [ ] T007 [P] Write failing unit tests in `tests/unit/test_validation.py`:
+- [X] T007 [P] Write failing unit tests in `tests/unit/test_validation.py`:
   - Emirates ID with dashes, without dashes, or with spaces normalises to `784-YYYY-NNNNNNN-N`.
   - IDs are rejected for a prefix other than `784`, a total length other than 15 digits,
     non-digits, or a year before 1900 or after the current year.
@@ -75,7 +75,7 @@ which every story depends on.
   - `family_size` must be a "whole number from 1 to 20".
   - Income must be "0–1,000,000 inclusive" with at most 2 decimal places.
   - Each failure returns the field name and the exact message from contracts/api.md.
-- [ ] T008 [P] Create pure domain types in `src/social_support/domain/models.py`:
+- [X] T008 [P] Create pure domain types in `src/social_support/domain/models.py`:
   - String enums:
     - `Outcome` (`APPROVE`, `SOFT_DECLINE`, `NEEDS_HUMAN_REVIEW`; no hard-decline value, per FR-008)
     - `EmploymentStatus` (`EMPLOYED`, `SELF_EMPLOYED`, `UNEMPLOYED`, `STUDENT`, `RETIRED`)
@@ -93,16 +93,16 @@ which every story depends on.
     - The rule version is non-empty.
     - `SOFT_DECLINE` requires at least 1 next step.
     - `NEEDS_HUMAN_REVIEW` requires a `flag_reason`.
-- [ ] T009 Implement `normalise_emirates_id()` and the field validators in
+- [X] T009 Implement `normalise_emirates_id()` and the field validators in
   `src/social_support/domain/validation.py` so that T007 passes. The validators return
   `list[FieldError(field, message)]` and depend on T007 and T008.
-- [ ] T010 Define the `Assessor` protocol and the factory in `src/social_support/domain/assessor.py`:
+- [X] T010 Define the `Assessor` protocol and the factory in `src/social_support/domain/assessor.py`:
   - The protocol has `rule_version: RuleVersionInfo` and
     `assess(application: ApplicationInput) -> AssessmentResult`.
   - `build_assessor(settings)` maps `"income_rule"` to `IncomePerMemberRuleAssessor` with a lazy
     import, and raises `ValueError` for any unknown name.
   - Also define the constant `FALLBACK_RULE_VERSION = RuleVersionInfo("fallback", "fallback", {})`.
-- [ ] T011 [P] Create the SQLAlchemy 2.x ORM models in `src/social_support/persistence/orm.py`,
+- [X] T011 [P] Create the SQLAlchemy 2.x ORM models in `src/social_support/persistence/orm.py`,
   using typed `Mapped[]` columns:
   - `applications`:
     - `id` integer PK
@@ -139,13 +139,13 @@ which every story depends on.
     - `occurred_at`
 
   Store enums as strings, per data-model.md.
-- [ ] T012 Implement `src/social_support/persistence/db.py` (depends on T011):
+- [X] T012 Implement `src/social_support/persistence/db.py` (depends on T011):
   - `make_engine(url)`. For SQLite, set `check_same_thread=False` and create the parent directory
     of the file.
   - A `sessionmaker`.
   - `init_db(engine)`, which calls `Base.metadata.create_all`.
   - A `get_session` FastAPI dependency.
-- [ ] T013 Implement `ApplicationRepository` in `src/social_support/persistence/repository.py`
+- [X] T013 Implement `ApplicationRepository` in `src/social_support/persistence/repository.py`
   with **add and get methods only** (FR-009, R8):
   - `ensure_rule_version(info: RuleVersionInfo)`: insert the row if it is absent; never modify an
     existing row.
@@ -153,16 +153,16 @@ which every story depends on.
   - `add_trace_step(application_id, step)`
 
   There are no update or delete methods. Depends on T011 and T012.
-- [ ] T014 [P] Implement `src/social_support/services/tracing.py`:
+- [X] T014 [P] Implement `src/social_support/services/tracing.py`:
   - `configure_logging()`: a JSON formatter on stdlib `logging` that emits only whitelisted
     `extra` keys (`reference_number`, `step`, `status`, `outcome`, `rule_version`, `error_type`).
     It must never emit `emirates_id`, income or name (Principle I).
   - `TraceRecorder`: collects ordered steps (sequence, step, status, detail, UTC `occurred_at`).
-- [ ] T015 [P] Implement the `RequestValidationError` handler in `src/social_support/api/errors.py`.
+- [X] T015 [P] Implement the `RequestValidationError` handler in `src/social_support/api/errors.py`.
   It returns `422 {"errors": [{"field": ..., "message": ...}]}` with one entry per field: the field
   name is the last element of `loc`, and the message comes from the domain validator when one is
   available.
-- [ ] T016 Implement the app factory `create_app(settings: Settings | None = None)` in
+- [X] T016 Implement the app factory `create_app(settings: Settings | None = None)` in
   `src/social_support/api/main.py`, with an empty `APIRouter` in `src/social_support/api/routes.py`.
   - The lifespan:
     - calls `configure_logging()`
@@ -173,20 +173,20 @@ which every story depends on.
   - Register the error handler, mount the router at `/api/v1`, and add
     `GET /api/v1/health` returning `{"status": "ok", "assessor": ..., "rule_version": ...}`.
   - Depends on T010 and T012–T015.
-- [ ] T017 Create shared fixtures in `tests/conftest.py`:
+- [X] T017 Create shared fixtures in `tests/conftest.py`:
   - `settings` uses `sqlite://` (in-memory) with `StaticPool` and
     `caseworker_passcode="test-passcode"`.
   - `client` is a `TestClient(create_app(settings))` used as a context manager so the lifespan runs.
   - `FailingAssessor`, whose `assess` raises `RuntimeError`.
   - `make_client(assessor=..., **settings_overrides)`, a factory used to inject fakes.
   - A `db_session` fixture for asserting on stored rows.
-- [ ] T018 [P] Create the base `ApiClient` in `src/social_support/ui/client.py`:
+- [X] T018 [P] Create the base `ApiClient` in `src/social_support/ui/client.py`:
   - An `httpx.Client` with `base_url` from the `API_BASE_URL` environment variable and a 10 s
     timeout.
   - A private `_request()` method that maps non-2xx responses to
     `ApiError(status_code, detail, field_errors: dict[str, str])`.
   - It imports nothing from other `social_support` subpackages (R1).
-- [ ] T019 [P] Create the Streamlit shell in `src/social_support/ui/app.py`:
+- [X] T019 [P] Create the Streamlit shell in `src/social_support/ui/app.py`:
   - Page title "Social Support Assessment".
   - `st.tabs(["Apply", "Look up", "Review queue"])`, each tab calling a placeholder
     `render_<tab>(client)` function.
@@ -210,7 +210,7 @@ invalid one shows field messages and nothing is stored (quickstart steps 1–5).
 
 ### Tests for User Story 1 ⚠️ (write first; they must fail)
 
-- [ ] T020 [P] [US1] Write unit tests for the rule in `tests/unit/test_income_rule.py`:
+- [X] T020 [P] [US1] Write unit tests for the rule in `tests/unit/test_income_rule.py`:
   - Outcomes at the boundaries:
     - 1999.99 gives `APPROVE`.
     - 2000.00 and 2500.00 give `NEEDS_HUMAN_REVIEW` with `flag_reason == "borderline income"`.
@@ -222,10 +222,10 @@ invalid one shows field messages and nothing is stored (quickstart steps 1–5).
   - The Needs Human Review explanation contains "caseworker".
   - The rule version id matches `^income-per-member/v0\.1\+[0-9a-f]{8}$`. It stays the same for the
     same parameters and changes when either parameter changes.
-- [ ] T021 [P] [US1] Write unit tests for reference numbers in `tests/unit/test_reference.py`.
+- [X] T021 [P] [US1] Write unit tests for reference numbers in `tests/unit/test_reference.py`.
   Values must match `^SSA-[0-9A-HJKMNP-TV-Z]{10}$` (Crockford base32, no I/L/O/U), and 1,000
   generated values must be unique.
-- [ ] T022 [P] [US1] Write contract tests in `tests/contract/test_submit_contract.py` for
+- [X] T022 [P] [US1] Write contract tests in `tests/contract/test_submit_contract.py` for
   `POST /api/v1/applications`, checking against contracts/api.md:
   - A `201` response has exactly the documented keys.
   - Money values are strings with 2 dp, and there is no internal `id` anywhere in the response.
@@ -233,13 +233,13 @@ invalid one shows field messages and nothing is stored (quickstart steps 1–5).
   - The app exposes no `PUT`, `PATCH` or `DELETE` route under `/api/v1/applications` (FR-009).
   - A payload containing `nationality` returns 422 with an `errors[]` entry for that field
     (FR-014).
-- [ ] T023 [P] [US1] Create the synthetic fixtures in `tests/fixtures/synthetic_applications.py`:
+- [X] T023 [P] [US1] Create the synthetic fixtures in `tests/fixtures/synthetic_applications.py`:
   - `VALID_CASES`: at least 20 entries of `(payload, expected_outcome)` covering all 3 outcomes,
     every boundary value from data-model.md, zero income, family sizes 1 and 20, and all 5
     employment statuses.
   - `INVALID_CASES`: at least one `(payload, expected_error_field)` per validation rule in FR-002.
   - Use only synthetic names and IDs in the `784-YYYY-NNNNNNN-N` format.
-- [ ] T024 [US1] Write integration tests in `tests/integration/test_submit_flow.py`, using T017
+- [X] T024 [US1] Write integration tests in `tests/integration/test_submit_flow.py`, using T017
   and T023:
   - Every `VALID_CASES` entry gets its expected outcome (SC-005).
   - Every `INVALID_CASES` entry returns 422 and leaves zero rows in `applications` (SC-006).
@@ -256,7 +256,7 @@ invalid one shows field messages and nothing is stored (quickstart steps 1–5).
   - Logs captured with `caplog` contain the reference number but never the Emirates ID or the
     income value.
   - Submitting all `VALID_CASES` gives a 95th-percentile response time under 5 s (SC-002).
-- [ ] T025 [P] [US1] Write a UI smoke test in `tests/ui/test_ui_smoke.py` using
+- [X] T025 [P] [US1] Write a UI smoke test in `tests/ui/test_ui_smoke.py` using
   `streamlit.testing.v1.AppTest` with a monkeypatched `ApiClient`:
   - The Apply tab renders all 5 fields and the income definition help text.
   - Submitting shows the outcome, explanation and reference number.
@@ -264,7 +264,7 @@ invalid one shows field messages and nothing is stored (quickstart steps 1–5).
 
 ### Implementation for User Story 1
 
-- [ ] T026 [P] [US1] Implement `IncomePerMemberRuleAssessor(threshold_aed, band_upper_aed)` in
+- [X] T026 [P] [US1] Implement `IncomePerMemberRuleAssessor(threshold_aed, band_upper_aed)` in
   `src/social_support/assessment/income_rule.py`, following data-model.md:
   - `ipm = net_monthly_income_aed / family_size`, rounded with `ROUND_HALF_UP` to 2 dp.
   - The rule version id is `income-per-member/v0.1+` followed by the first 8 hex characters of the
@@ -281,12 +281,12 @@ invalid one shows field messages and nothing is stored (quickstart steps 1–5).
   - The fallback explanation (built in T029) states that automatic assessment was unavailable and
     that a caseworker will review the application.
   - T020 must pass.
-- [ ] T027 [P] [US1] Implement `generate_reference()` in `src/social_support/services/reference.py`.
+- [X] T027 [P] [US1] Implement `generate_reference()` in `src/social_support/services/reference.py`.
   It returns `"SSA-"` plus 10 Crockford base32 characters built from `secrets.token_bytes`.
   T021 must pass.
-- [ ] T028 [US1] Add `emirates_id_has_applications(emirates_id) -> bool` and
+- [X] T028 [US1] Add `emirates_id_has_applications(emirates_id) -> bool` and
   `reference_exists(ref) -> bool` to `src/social_support/persistence/repository.py`.
-- [ ] T029 [US1] Implement `ApplicationService.submit(payload)` in
+- [X] T029 [US1] Implement `ApplicationService.submit(payload)` in
   `src/social_support/services/applications.py`:
   1. Record RECEIVED and VALIDATED.
   2. Run the duplicate check (FR-017).
@@ -299,7 +299,7 @@ invalid one shows field messages and nothing is stored (quickstart steps 1–5).
   7. Log `reference_number`, `outcome` and `rule_version` only.
 
   Return a result DTO. Depends on T026–T028.
-- [ ] T030 [US1] Define `SubmitApplicationRequest`, `DecisionOut` and `SubmitApplicationResponse`
+- [X] T030 [US1] Define `SubmitApplicationRequest`, `DecisionOut` and `SubmitApplicationResponse`
   in `src/social_support/api/schemas.py`:
   - Field validators call `domain/validation.py`, so the messages match T007.
   - `emirates_id` is normalised on input.
@@ -308,10 +308,10 @@ invalid one shows field messages and nothing is stored (quickstart steps 1–5).
   - There is no internal `id`.
   - `SubmitApplicationRequest` sets `model_config = ConfigDict(extra="forbid")`, so unknown fields
     such as `nationality` are rejected (FR-014).
-- [ ] T031 [US1] Implement the `POST /applications` route in `src/social_support/api/routes.py`.
+- [X] T031 [US1] Implement the `POST /applications` route in `src/social_support/api/routes.py`.
   It returns `201` with `SubmitApplicationResponse` and gets the service from `app.state` and the
   session dependency. T022 and T024 must pass.
-- [ ] T032 [US1] Add `submit(payload) -> dict` to `src/social_support/ui/client.py` and implement
+- [X] T032 [US1] Add `submit(payload) -> dict` to `src/social_support/ui/client.py` and implement
   `render_apply` in `src/social_support/ui/app.py`:
   - A form for name, Emirates ID, family size (1–20), net monthly income (AED) and employment
     status.
