@@ -424,26 +424,26 @@ and no data is shown (quickstart steps 8–9).
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T045 [P] Write architecture guard tests in `tests/unit/test_architecture.py`:
+- [X] T045 [P] Write architecture guard tests in `tests/unit/test_architecture.py`:
   - Modules in `social_support.ui` import nothing from the `domain`, `assessment`, `persistence`
     or `services` packages.
   - `social_support.domain` imports neither `sqlalchemy` nor `fastapi`.
   - The `ApplicationInput` fields are exactly `{family_size, net_monthly_income_aed,
     employment_status}`.
-- [ ] T046 [P] Write the root `README.md`:
+- [X] T046 [P] Write the root `README.md`:
   - Project purpose.
   - Prerequisites (uv; Python 3.12 is fetched automatically).
   - Setup, test and run commands, and the demo script, following
     [quickstart.md](./quickstart.md).
   - A link to the `specs/` folder as the design record.
-- [ ] T047 [P] Update `CLAUDE.md`:
+- [X] T047 [P] Update `CLAUDE.md`:
   - Replace "No source code exists yet" with the real commands (`uv sync`, `uv run pytest`, how to
     run a single test, ruff, uvicorn and streamlit).
   - Describe the layering: `domain` → `assessment`/`persistence` → `services` → `api`, with `ui`
     talking to the API only, and `Assessor` as the extension point.
-- [ ] T048 Run `uv run ruff check .`, `uv run ruff format --check .` and `uv run pytest`, and fix
+- [X] T048 Run `uv run ruff check .`, `uv run ruff format --check .` and `uv run pytest`, and fix
   every failure.
-- [ ] T049 Run the [quickstart.md](./quickstart.md) manual demo script (steps 1–9) and the FR-013
+- [X] T049 Run the [quickstart.md](./quickstart.md) manual demo script (steps 1–9) and the FR-013
   rule-change check against the running API and UI. Record any deviations in this file under
   Notes.
 
@@ -525,3 +525,32 @@ T033 | T034 | T040 | T041
 - Every task ID maps back to an FR, an SC or a research decision, so `/speckit-analyze` can check
   coverage.
 - Use synthetic data only (Constitution I). Never put real Emirates IDs in fixtures.
+
+### Implementation notes (recorded at T049, 2026-10-23)
+
+**Quickstart validation:** run against a clean database through the live API.
+- Steps 1–9 all matched the expected results.
+- FR-013 passed. Restarting with `RULE_THRESHOLD_AED=1800` produced a new rule version
+  (`…+812c736f`), and 1900 AED per member became Needs Human Review. The step 1 decision kept
+  `…+86a0cfe8`.
+- Every application had the full trace RECEIVED → VALIDATED → ASSESSED → STORED → RESULT_RETURNED.
+- The API logs contained no Emirates IDs, names or incomes.
+
+**Deviations and open items**
+- The UI steps were validated with Streamlit `AppTest` smoke tests (10 tests) plus the API calls
+  above, not by clicking through a browser.
+- SC-001 (form in under 2 minutes) and SC-007 (demo in under 5 minutes) need a person to time
+  them. That is still open for the user.
+- RECEIVED and VALIDATED are recorded together, because schema validation runs before the
+  service. Separate timings become meaningful once extraction and validation are separate agents.
+- The UI's family size and income inputs are deliberately unconstrained, so that the server-side
+  field messages (quickstart step 4) are visible.
+
+**Lessons that affect future features**
+- FastAPI 0.161 hides included routers from `app.routes`. The FR-009 route test passed without
+  checking anything until US2 exposed it. Route checks now use `app.openapi()["paths"]` and guard
+  against an empty match.
+- On Windows, `uvicorn --reload` can hang mid-reload and keep serving old routes.
+- The review queue was first wired from the route directly to the repository. It was moved behind
+  `ApplicationService`, and T045 gained an extra guard: `api` must not import ORM models.
+- Every guard test was mutation-checked: a violation was planted and the test confirmed to fail.
