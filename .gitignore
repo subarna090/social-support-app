@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Secrets / local config
+.env
+.env.*
+!.env.example
+
+# Local data stores & generated artifacts
+data/generated/
+*.sqlite
+*.db
+chroma/
+models/*.joblib
+
+# Claude Code local state (skills under .claude/skills are shared)
+.claude/settings.local.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+~$*.docx
+
+# Assessment brief (kept local, not for a public repo)
+*.docx
