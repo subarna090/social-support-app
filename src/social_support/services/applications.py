@@ -1,4 +1,4 @@
-"""Application use cases: submit (US1) and lookup (US2)."""
+"""Application use cases: submit (US1), lookup (US2) and review queue (US3)."""
 
 import logging
 import secrets
@@ -57,6 +57,14 @@ class SubmissionResult:
 class LookupResult:
     submission: Submission
     result: SubmissionResult
+
+
+@dataclass(frozen=True)
+class ReviewItem:
+    reference_number: str
+    full_name: str
+    submitted_at: datetime
+    flag_reason: str | None
 
 
 def _trace_row(record: TraceRecord) -> ProcessingTraceStepRow:
@@ -154,6 +162,13 @@ class ApplicationService:
                 decided_at=decision.decided_at,
             ),
         )
+
+    def review_queue(self) -> list[ReviewItem]:
+        """Applications awaiting a caseworker, newest first (FR-012)."""
+        return [
+            ReviewItem(a.reference_number, a.full_name, a.submitted_at, d.flag_reason)
+            for a, d in self.repository.list_needs_review()
+        ]
 
     def _assess(
         self, submission: Submission, trace: TraceRecorder, reference: str

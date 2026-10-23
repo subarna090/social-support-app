@@ -145,8 +145,41 @@ def render_lookup(client: ApiClient) -> None:
         st.caption(f"Decided {decision['decided_at']} using rule {decision['rule_version']}.")
 
 
+def _load_review_queue() -> None:
+    state = st.session_state
+    state.review_items, state.review_failure = None, None
+    try:
+        state.review_items = get_client().review_queue(state.review_passcode)["items"]
+    except ApiError as exc:
+        state.review_failure = exc.detail
+
+
 def render_review(client: ApiClient) -> None:
-    st.info("Caseworker review queue: coming in User Story 3.")
+    st.caption("For caseworkers. Enter the shared caseworker passcode.")
+    with st.form("review"):
+        st.text_input("Caseworker passcode", key="review_passcode", type="password")
+        st.form_submit_button("Show review queue", on_click=_load_review_queue)
+
+    if st.session_state.get("review_failure"):
+        st.error(st.session_state.review_failure)
+    items = st.session_state.get("review_items")
+    if items is None:
+        return
+    if not items:
+        st.info("No applications are waiting for review.")
+        return
+    st.markdown(f"**{len(items)} application(s) waiting for review**, newest first")
+    st.table(
+        [
+            {
+                "Reference": item["reference_number"],
+                "Name": item["full_name"],
+                "Submitted (UTC)": item["submitted_at"],
+                "Flag reason": item["flag_reason"],
+            }
+            for item in items
+        ]
+    )
 
 
 def main() -> None:

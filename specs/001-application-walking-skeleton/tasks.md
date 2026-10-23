@@ -387,12 +387,12 @@ and no data is shown (quickstart steps 8–9).
 
 ### Tests for User Story 3 ⚠️ (write first; they must fail)
 
-- [ ] T040 [P] [US3] Write contract tests in `tests/contract/test_review_queue_contract.py` for
+- [X] T040 [P] [US3] Write contract tests in `tests/contract/test_review_queue_contract.py` for
   `GET /api/v1/review-queue`:
   - `401 {"detail": "Access denied."}` when the `X-Caseworker-Passcode` header is missing, when it
     is wrong, and when the server has no passcode configured.
   - A `200` response has `{"items": [{reference_number, full_name, submitted_at, flag_reason}]}`.
-- [ ] T041 [P] [US3] Write integration tests in `tests/integration/test_review_queue_flow.py`:
+- [X] T041 [P] [US3] Write integration tests in `tests/integration/test_review_queue_flow.py`:
   - With mixed outcomes, only `NEEDS_HUMAN_REVIEW` items are listed, newest first. This includes
     fallback (assessment-failed) cases.
   - With no review cases, the response is `{"items": []}`.
@@ -400,9 +400,9 @@ and no data is shown (quickstart steps 8–9).
 
 ### Implementation for User Story 3
 
-- [ ] T042 [US3] Add `list_needs_review()` to `src/social_support/persistence/repository.py`. It
+- [X] T042 [US3] Add `list_needs_review()` to `src/social_support/persistence/repository.py`. It
   joins decisions where the outcome is `NEEDS_HUMAN_REVIEW` and orders by `submitted_at` descending.
-- [ ] T043 [US3] Implement the review queue on the API side:
+- [X] T043 [US3] Implement the review queue on the API side:
   - Add `ReviewQueueItem` and `ReviewQueueResponse` to `src/social_support/api/schemas.py`.
   - Add the `require_caseworker` dependency in `src/social_support/api/routes.py`. It reads the
     `X-Caseworker-Passcode` header, compares it with `secrets.compare_digest` against
@@ -411,7 +411,7 @@ and no data is shown (quickstart steps 8–9).
   - Add the `GET /review-queue` route.
 
   T040 and T041 must pass.
-- [ ] T044 [US3] Add `review_queue(passcode)` to `src/social_support/ui/client.py` and implement
+- [X] T044 [US3] Add `review_queue(passcode)` to `src/social_support/ui/client.py` and implement
   `render_review` in `src/social_support/ui/app.py`:
   - A password-type passcode input.
   - A table of reference, name, submitted time and flag reason.

@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from sqlalchemy import exists, select
 from sqlalchemy.orm import Session, selectinload
 
-from social_support.domain.models import RuleVersionInfo
+from social_support.domain.models import Outcome, RuleVersionInfo
 from social_support.persistence.orm import (
     ApplicationRow,
     AssessmentRuleVersionRow,
@@ -60,6 +60,16 @@ class ApplicationRepository:
             .options(selectinload(ApplicationRow.decision))
             .where(ApplicationRow.reference_number == reference_number)
         )
+
+    def list_needs_review(self) -> list[tuple[ApplicationRow, DecisionRow]]:
+        """Applications whose decision is Needs Human Review, newest first."""
+        rows = self.session.execute(
+            select(ApplicationRow, DecisionRow)
+            .join(DecisionRow, DecisionRow.application_id == ApplicationRow.id)
+            .where(DecisionRow.outcome == Outcome.NEEDS_HUMAN_REVIEW.value)
+            .order_by(ApplicationRow.submitted_at.desc(), ApplicationRow.id.desc())
+        )
+        return [(application, decision) for application, decision in rows]
 
     def reference_exists(self, reference_number: str) -> bool:
         return self.session.scalar(

@@ -114,3 +114,14 @@ class ApplicationOut(BaseModel):
 
 class LookupResponse(SubmitApplicationResponse):
     application: ApplicationOut
+
+
+class ReviewQueueItem(BaseModel):
+    reference_number: str
+    full_name: str
+    submitted_at: str
+    flag_reason: str | None
+
+
+class ReviewQueueResponse(BaseModel):
+    items: list[ReviewQueueItem]

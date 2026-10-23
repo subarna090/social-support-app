@@ -42,6 +42,12 @@ class FakeClient:
     submitted: list[dict] = []
 
     lookup_response: dict | ApiError = APPROVED
+    review_response: dict | ApiError = {"items": []}
+
+    def review_queue(self, passcode: str) -> dict:
+        if isinstance(self.review_response, ApiError):
+            raise self.review_response
+        return self.review_response
 
     def lookup(self, reference_number: str, emirates_id: str) -> dict:
         if isinstance(self.lookup_response, ApiError):
@@ -60,6 +66,7 @@ def app(monkeypatch) -> AppTest:
     st.cache_resource.clear()
     FakeClient.response, FakeClient.submitted = APPROVED, []
     FakeClient.lookup_response = APPROVED | {"application": APPLICATION}
+    FakeClient.review_response = {"items": []}
     monkeypatch.setattr(client_module, "ApiClient", FakeClient)
     return AppTest.from_file(str(APP), default_timeout=30).run()
 
@@ -131,3 +138,38 @@ def test_lookup_not_found_message(app):
     FakeClient.lookup_response = ApiError(404, "No application found for the details provided.")
     _look_up(app)
     assert "No application found for the details provided." in _texts(app)
+
+
+def _open_review(at: AppTest) -> None:
+    at.text_input(key="review_passcode").input("secret")
+    next(b for b in at.button if b.label == "Show review queue").click().run()
+
+
+def test_review_queue_lists_items(app):
+    FakeClient.review_response = {
+        "items": [
+            {
+                "reference_number": "SSA-Q4M8ZK2R1C",
+                "full_name": "Omar Haddad",
+                "submitted_at": "2026-10-23T10:20:44Z",
+                "flag_reason": "borderline income",
+            }
+        ]
+    }
+    _open_review(app)
+    assert not app.exception
+    table = app.table[0].value
+    assert list(table["Reference"]) == ["SSA-Q4M8ZK2R1C"]
+    assert list(table["Flag reason"]) == ["borderline income"]
+
+
+def test_review_queue_empty_state(app):
+    _open_review(app)
+    assert "No applications are waiting for review." in _texts(app)
+
+
+def test_review_queue_access_denied(app):
+    FakeClient.review_response = ApiError(401, "Access denied.")
+    _open_review(app)
+    assert "Access denied." in _texts(app)
+    assert not app.table

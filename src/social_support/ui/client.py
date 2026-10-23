@@ -51,6 +51,10 @@ class ApiClient:
     def submit(self, payload: dict) -> dict:
         return self._request("POST", "/api/v1/applications", json=payload)
 
+    def review_queue(self, passcode: str) -> dict:
+        headers = {"X-Caseworker-Passcode": passcode}
+        return self._request("GET", "/api/v1/review-queue", headers=headers)
+
     def lookup(self, reference_number: str, emirates_id: str) -> dict:
         body = {"reference_number": reference_number, "emirates_id": emirates_id}
         return self._request("POST", "/api/v1/applications/lookup", json=body)
