@@ -9,6 +9,7 @@ from datetime import date
 from pathlib import Path
 
 from social_support.domain.models import Outcome
+from social_support.services.tracing import configure_logging
 from social_support.synthetic.profile import SamplingError
 from social_support.synthetic.run import (
     INCONSISTENCY_TYPES,
@@ -111,6 +112,7 @@ def _seed(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_logging()  # JSON records on stderr; per-pack records are DEBUG, so hidden by default
     try:
         args = build_parser().parse_args(argv)
         if args.command == "generate":

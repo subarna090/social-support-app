@@ -139,7 +139,7 @@ def test_run_record(run):
 def test_logs_carry_ids_but_no_personal_data(tmp_path, caplog):  # U3, Principle I/VII
     from social_support.services.tracing import JsonFormatter
 
-    caplog.set_level(logging.INFO, logger="social_support")
+    caplog.set_level(logging.DEBUG, logger="social_support")  # per-pack records are DEBUG
     run = generate(GenerationRequest(count=3, seed=9, output_root=tmp_path))
     lines = [
         JsonFormatter().format(r) for r in caplog.records if r.name.startswith("social_support")
@@ -202,3 +202,24 @@ def test_restricting_types_injects_only_those(tmp_path):  # US2 scenario 2
     for pack in sorted((run.folder / "packs").iterdir()):
         _, key = pack_checks.load(pack)
         assert key["inconsistency"] is None or key["inconsistency"]["type"] == "ADDRESS_MISMATCH"
+
+
+def test_households_without_a_mortgage_pay_rent(packs):  # T049, research R7
+    renting = 0
+    for pack in packs:
+        _, key = pack_checks.load(pack)
+        has_mortgage = any(li["kind"] == "MORTGAGE" for li in key["profile"]["liabilities"])
+        descriptions = [
+            t["description"]
+            for month in key["documents"]["bank_statement"]["months"]
+            for t in month["transactions"]
+        ]
+        rent = [d for d in descriptions if d.startswith("Rent - ")]
+        if has_mortgage:
+            assert rent == [], pack.name
+        else:
+            renting += 1
+            assert len(rent) == len(key["documents"]["bank_statement"]["months"]), pack.name
+            assert all("(Demo)" in d for d in rent)
+            assert "Rent - " in pack_checks.pdf_text(pack / "bank_statement.pdf")
+    assert renting

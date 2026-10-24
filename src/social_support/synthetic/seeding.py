@@ -60,7 +60,7 @@ def seed_run(run_folder: Path, client: ApiClient, limit: int | None = None) -> S
             rows.append(
                 {"pack_id": pack.name, "status": "rejected", "eligibility_outcome": expected}
             )
-            logger.info("pack rejected", extra={"pack_id": pack.name, "status": "rejected"})
+            logger.debug("pack rejected", extra={"pack_id": pack.name, "status": "rejected"})
             continue
         returned = result["decision"]["outcome"]
         matched = returned == expected
@@ -77,7 +77,7 @@ def seed_run(run_folder: Path, client: ApiClient, limit: int | None = None) -> S
                 "matched": str(matched).lower(),
             }
         )
-        logger.info(
+        logger.debug(
             "pack seeded",
             extra={"pack_id": pack.name, "reference_number": result["reference_number"]},
         )

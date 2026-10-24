@@ -480,18 +480,18 @@ their Emirates IDs.
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T043 [P] Write `tests/integration/test_generation_speed.py`, marked `@pytest.mark.slow`
+- [X] T043 [P] Write `tests/integration/test_generation_speed.py`, marked `@pytest.mark.slow`
   (SC-001): 100 packs with default settings finish in under 300 s. Run it with
   `uv run pytest -m slow` and record the measured time in the Notes below.
-- [ ] T044 [P] Update `README.md` with a "Synthetic data" section: the commands from quickstart
+- [X] T044 [P] Update `README.md` with a "Synthetic data" section: the commands from quickstart
   steps 2–7, the output layout, the two labels, and the privacy notes (synthetic marking, reserved
   ID block, git-ignored output). Also add the commands and the `labelling` / `synthetic` layering
   rules to `CLAUDE.md`. Edit only these sections; leave the user's other README changes as they
   are.
-- [ ] T045 Run the full [quickstart.md](./quickstart.md) (steps 1–8) on a clean `data/synthetic/`.
+- [X] T045 Run the full [quickstart.md](./quickstart.md) (steps 1–8) on a clean `data/synthetic/`.
   Open one pack's five documents by eye: they must be readable and synthetic-marked, with no real
   branding. Record the results in the Notes below.
-- [ ] T046 Run `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest` and
+- [X] T046 Run `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest` and
   `uv run pytest -m slow`, and confirm all are green. Then run `/speckit-converge`.
 
 ---
@@ -644,3 +644,58 @@ T026 | T027 | T032 | T033 | T034 | T039 | T040
   always describes the latest attempt.
 - **Quiet console:** the "application unreachable" log record is at INFO, so Python's last-resort
   handler no longer prints it next to the contract message.
+
+### Implementation notes (recorded at T046, 2026-10-24)
+
+- **SC-001:** 100 packs with default settings in 10.6 s (limit 300 s), `test_generation_speed.py`.
+  Earlier, under heavier machine load, the rate was about 0.2-0.65 s per pack.
+- **Quickstart (T045), clean `data/synthetic/`:** steps 2-6 behave as documented (overwrite refused
+  with exit 2; copy byte-identical including `summary.csv`; 30 INCOME_MISMATCH of 100; mix 200 /
+  200 / 100; argument errors exit 2 and create nothing). Step 7 against live uvicorn: 10 seeded
+  (9 matched), review queue shows the borderline one; with the API stopped, exit 1. Step 8: 620
+  generated forms, all Emirates IDs in the `00` block; `data/` ignored by git; API log has no IDs.
+- **Documents checked by eye:** ID card, bank statement, credit report and resume are readable,
+  marked synthetic, and use only invented organisations.
+- **Known realism gaps (not required by the spec, left as is because fixing them changes every
+  generated file):** a self-employed applicant's job title comes from the general list, so it can
+  read oddly (for example "Security Guard" at the applicant's own company); the graduation year can
+  fall after the start of an earlier job.
+- **Final run:** `ruff check` and `ruff format --check` clean; `pytest` 364 passed; `pytest -m slow`
+  3 passed (SC-001, SC-003, SC-004).
+
+## Phase 8: Convergence
+
+- [X] T047 Configure structured JSON logging in `src/social_support/synthetic/cli.py` by calling
+  `services.tracing.configure_logging()` in `main`, so real CLI runs emit the records that
+  `synthetic/run.py` and `synthetic/seeding.py` already create. Move per-pack records ("pack
+  generated", "pack seeded", "pack rejected") to DEBUG and keep run-level records (run complete,
+  application unreachable) at INFO so a 500-pack run stays readable. Assert in
+  `tests/integration/test_cli.py` that a CLI run prints a JSON log line with `run_id` and no names,
+  Emirates IDs or incomes per plan: Constitution Check VII (CLI logs go through the JSON
+  formatter) (partial)
+- [X] T048 Build the bank statement's full transaction list (dates, descriptions, credit and debit
+  amounts, running balances, monthly closing balances) in the `bank_statement` view in
+  `src/social_support/synthetic/pack.py` instead of drawing amounts inside
+  `src/social_support/synthetic/documents/bank_statement.py`, so the renderer only draws what the
+  answer key records; extend `tests/integration/pack_checks.py` to check the closing balances
+  appear in the PDF per FR-005 (partial)
+- [X] T049 Add a monthly rent debit to the bank statement transactions for households without a
+  mortgage (invented landlord name containing "(Demo)"), as part of the T048 view, and assert in
+  `tests/integration/test_generate_batch.py` that such households show a rent line per research R7
+  and T018 (partial)
+
+### Implementation notes (recorded at T049, 2026-10-24)
+
+- **T047 logging:** `cli.main` calls `configure_logging()`. A plain `StreamHandler` binds the
+  `sys.stderr` that exists when it is created, which breaks when stderr is swapped (pytest capture,
+  or the CLI called repeatedly in one process), so `services.tracing` now uses a handler that
+  resolves `sys.stderr` at emit time. A real run prints one INFO JSON line (`run complete` with
+  `run_id`); per-pack records are DEBUG. contracts/cli.md documents this.
+- **T048 bank statement:** the full transaction list (running balances, monthly closing balances)
+  is built in the `bank_statement` view, so the renderer is a pure function of the answer key and
+  needs no random generator. `pack_checks` now checks every transaction description and balance.
+  contracts/pack-format.md documents `months` and `rent`.
+- **T049 rent:** households without a mortgage pay monthly rent (1,500–6,000 AED, day 3) to an
+  invented "(Demo)" landlord. Generated content changed with this phase, so earlier runs differ
+  from new runs with the same seed; determinism within the new version is unchanged and tested.
+- **Final run:** ruff clean; `pytest` 366 passed; `pytest -m slow` 3 passed.

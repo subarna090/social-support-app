@@ -165,11 +165,11 @@ def generate(request: GenerationRequest, policy: LabellingPolicy | None = None) 
             if kind:
                 inject(pack, kind, rng)
                 injected[kind.value] += 1
-            write_pack(pack, temp / "packs" / pack.pack_id, run_id, request.as_of, rng)
+            write_pack(pack, temp / "packs" / pack.pack_id, run_id, request.as_of)
             eligibility[pack.label.outcome.value] += 1
             routing[pack.expected_routing.value] += 1
             rows.append(summary_row(pack))
-            logger.info("pack generated", extra={"run_id": run_id, "pack_id": pack.pack_id})
+            logger.debug("pack generated", extra={"run_id": run_id, "pack_id": pack.pack_id})
 
         counts = {
             "packs": request.count,

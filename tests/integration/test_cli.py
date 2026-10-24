@@ -95,3 +95,18 @@ def test_final_rename_retries_when_windows_holds_the_folder(tmp_path, monkeypatc
         run_module.GenerationRequest(count=1, seed=3, output_root=tmp_path)
     )
     assert result.folder.is_dir() and len(calls) == 3
+
+
+def test_cli_runs_emit_structured_logs_without_personal_data(tmp_path, capsys):  # T047
+    code = main(["generate", "--count", "2", "--seed", "6", "--out", str(tmp_path)])
+    _, err = capsys.readouterr()
+    assert code == 0
+    records = [json.loads(line) for line in err.splitlines() if line.startswith("{")]
+    complete = [r for r in records if r["message"] == "run complete"]
+    assert len(complete) == 1 and complete[0]["run_id"].startswith("s6-n2-")
+    assert not [r for r in records if r["message"] == "pack generated"]  # per-pack is DEBUG
+    (run_folder,) = tmp_path.iterdir()
+    for pack in (run_folder / "packs").iterdir():
+        form = json.loads((pack / "form.json").read_text(encoding="utf-8"))
+        for secret in (form["full_name"], form["emirates_id"], form["net_monthly_income_aed"]):
+            assert secret not in err

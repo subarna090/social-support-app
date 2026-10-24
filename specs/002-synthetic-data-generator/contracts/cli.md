@@ -8,6 +8,10 @@ A console script registered in `pyproject.toml`. It can also be run as
 Console output never contains names, Emirates IDs, addresses or incomes; it shows only pack ids,
 reference numbers, counts and paths.
 
+Structured JSON log records go to stderr (the project's JSON formatter, whitelisted keys only).
+Run-level records (`run complete`, `application unreachable`) are INFO; per-pack records are
+DEBUG and hidden by default.
+
 ---
 
 ## `generate`

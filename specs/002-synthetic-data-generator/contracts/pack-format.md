@@ -87,6 +87,10 @@ Every PDF page, the PNG, and every sheet of the xlsx (in cell A1) carries
 - `documents.<type>` holds the value of every field **as shown in that document** (values only, no
   positions; clarify Q3), in canonical form: money as `"6000.00"`, dates as `YYYY-MM-DD`. Documents
   display money with thousands separators (`6,000.00 AED`), so consumers compare after formatting. With no inconsistency, every shared field agrees with `profile`.
+- `documents.bank_statement` also holds `months`: for each statement month, every transaction
+  (`date`, `description`, `credit_aed`, `debit_aed`, `balance_aed`) and the `closing_balance_aed`,
+  plus `rent` (description and amount, or null for households with a mortgage). The PDF draws
+  exactly these rows.
 - `inconsistency`, when present:
   `{"type": "INCOME_MISMATCH", "documents": ["form", "bank_statement"], "field": "net_monthly_income_aed", "true_value": "6000.00", "altered_value": "4200.00"}`.
 - `expected_routing` is `NEEDS_HUMAN_REVIEW` when `inconsistency` is present, otherwise

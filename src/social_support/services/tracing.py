@@ -6,6 +6,7 @@ never logged (Principle I).
 
 import json
 import logging
+import sys
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -43,12 +44,28 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, default=str)
 
 
+class _CurrentStderrHandler(logging.StreamHandler):
+    """Writes to whatever ``sys.stderr`` is at emit time, so a handler created once keeps
+    working when stderr is swapped (test capture, or a CLI invoked repeatedly in one process)."""
+
+    def __init__(self) -> None:
+        super().__init__(sys.stderr)
+
+    @property
+    def stream(self):
+        return sys.stderr
+
+    @stream.setter
+    def stream(self, _value) -> None:
+        pass
+
+
 def configure_logging(level: int = logging.INFO) -> None:
     """Attach a JSON handler to the application logger (idempotent)."""
     logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(level)
     if not any(isinstance(h.formatter, JsonFormatter) for h in logger.handlers):
-        handler = logging.StreamHandler()
+        handler = _CurrentStderrHandler()
         handler.setFormatter(JsonFormatter())
         logger.addHandler(handler)
 

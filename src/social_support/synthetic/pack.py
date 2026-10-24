@@ -15,6 +15,7 @@ from pathlib import Path
 
 from social_support.domain.models import Outcome
 from social_support.labelling import HouseholdFacts, LabellingPolicy, LabelResult
+from social_support.labelling.facts import money
 from social_support.synthetic.documents.assets_liabilities import render_assets_liabilities
 from social_support.synthetic.documents.bank_statement import render_bank_statement
 from social_support.synthetic.documents.credit_report import render_credit_report
@@ -102,6 +103,63 @@ def submission(form: dict) -> dict:
     return {key: form[key] for key in keys}
 
 
+LANDLORDS = (
+    "Palm Grove Properties (Demo)",
+    "Oasis Residences Management (Demo)",
+    "Crescent Homes Leasing (Demo)",
+    "Golden Dunes Real Estate (Demo)",
+)
+
+
+def _statement_months(
+    start_index: int,
+    months: int,
+    opening: Decimal,
+    credits: list[dict],
+    payments: list[dict],
+    rent: dict | None,
+    rng: random.Random,
+) -> list[dict]:
+    """Every transaction the statement shows, with running and closing balances (FR-005)."""
+    balance, result = opening, []
+    for index in range(start_index, start_index + months):
+        year, month = index // 12, index % 12 + 1
+        entries = [(1, c["description"], Decimal(c["amount_aed"]), None) for c in credits]
+        if rent:
+            entries.append((3, rent["description"], None, Decimal(rent["amount_aed"])))
+        entries += [(5, p["description"], None, Decimal(p["amount_aed"])) for p in payments]
+        entries += [
+            (10, "Utilities - Oasis Power and Water (Demo)", None, Decimal(rng.randint(250, 900))),
+            (
+                15,
+                "Groceries - Spice Route Supermarket (Demo)",
+                None,
+                Decimal(rng.randint(300, 1500)),
+            ),
+            (25, "Groceries - Palm Leaf Retail (Demo)", None, Decimal(rng.randint(200, 1200))),
+        ]
+        transactions = []
+        for day, description, credit, debit in entries:
+            balance += (credit or 0) - (debit or 0)
+            transactions.append(
+                {
+                    "date": date(year, month, day).isoformat(),
+                    "description": description,
+                    "credit_aed": jsonable(credit) if credit else None,
+                    "debit_aed": jsonable(debit) if debit else None,
+                    "balance_aed": jsonable(balance),
+                }
+            )
+        result.append(
+            {
+                "month": date(year, month, 1).isoformat(),
+                "transactions": transactions,
+                "closing_balance_aed": jsonable(balance),
+            }
+        )
+    return result
+
+
 def build_views(profile: HouseholdProfile, as_of: date, rng: random.Random) -> dict[str, dict]:
     ref = load_reference_data()
     address = profile.address.one_line()
@@ -123,6 +181,15 @@ def build_views(profile: HouseholdProfile, as_of: date, rng: random.Random) -> d
         }
         for li in profile.liabilities
     ]
+    rent = None
+    if not any(li.kind == "MORTGAGE" for li in profile.liabilities):  # research R7
+        rent = {
+            "description": f"Rent - {rng.choice(LANDLORDS)}",
+            "amount_aed": jsonable(money(round(rng.uniform(1500, 6000) / 50) * 50)),
+        }
+    account_number = f"DFDB 0000 {rng.randint(0, 99_999_999):08d}"
+    opening = profile.assets[0].value_aed
+    statement = _statement_months(start_index, months, opening, credits, payments, rent, rng)
     facts_total_assets = sum((a.value_aed for a in profile.assets), Decimal("0"))
     facts_total_liabilities = sum((li.outstanding_aed for li in profile.liabilities), Decimal("0"))
     current = profile.current_job
@@ -131,7 +198,7 @@ def build_views(profile: HouseholdProfile, as_of: date, rng: random.Random) -> d
             "bank_name": ref["bank_name"],
             "account_holder": profile.full_name,
             "address": address,
-            "account_number": f"DFDB 0000 {rng.randint(0, 99_999_999):08d}",
+            "account_number": account_number,
             "statement_months": months,
             "period_start": date(start_index // 12, start_index % 12 + 1, 1).isoformat(),
             "period_end": date(end_index // 12, end_index % 12 + 1, 1).isoformat(),
@@ -139,6 +206,8 @@ def build_views(profile: HouseholdProfile, as_of: date, rng: random.Random) -> d
             "income_credits": credits,
             "monthly_income_credits_aed": jsonable(profile.net_monthly_income_aed),
             "monthly_payments": payments,
+            "rent": rent,
+            "months": statement,
         },
         "emirates_id": {
             "full_name": profile.full_name,
@@ -201,10 +270,10 @@ def build_pack(
     )
 
 
-def write_pack(pack: ApplicantPack, folder: Path, run_id: str, as_of: date, rng: random.Random):
+def write_pack(pack: ApplicantPack, folder: Path, run_id: str, as_of: date):
     folder.mkdir(parents=True)
     v = pack.views
-    render_bank_statement(v["bank_statement"], folder / "bank_statement.pdf", rng)
+    render_bank_statement(v["bank_statement"], folder / "bank_statement.pdf")
     render_emirates_id(v["emirates_id"], folder / "emirates_id.png")
     render_resume(v["resume"], folder / "resume.pdf")
     render_assets_liabilities(v["assets_liabilities"], folder / "assets_liabilities.xlsx", as_of)

@@ -1,8 +1,6 @@
-"""Bank statement PDF (research R7): income credits, fixed payments and everyday spending."""
+"""Bank statement PDF (research R7). Draws exactly the transactions in the view (FR-005)."""
 
-import random
 from datetime import date
-from decimal import Decimal
 from pathlib import Path
 
 from reportlab.platypus import Paragraph, Spacer
@@ -17,18 +15,8 @@ from social_support.synthetic.documents.common import (
 )
 
 
-def _months(period_start: date, count: int) -> list[date]:
-    months, year, month = [], period_start.year, period_start.month
-    for _ in range(count):
-        months.append(date(year, month, 1))
-        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
-    return months
-
-
-def render_bank_statement(shown: dict, path: Path, rng: random.Random) -> RenderedDocument:
+def render_bank_statement(shown: dict, path: Path) -> RenderedDocument:
     s = styles()
-    months = _months(date.fromisoformat(shown["period_start"]), shown["statement_months"])
-    balance = Decimal(shown["opening_balance_aed"])
     story = [
         Paragraph(shown["bank_name"], s["title"]),
         Paragraph("Account statement", s["h2"]),
@@ -40,44 +28,27 @@ def render_bank_statement(shown: dict, path: Path, rng: random.Random) -> Render
             f"{month_label(shown['period_end'])} ({shown['statement_months']} months)",
             s["body"],
         ),
-        Paragraph(f"Opening balance: {money(balance)} AED", s["body"]),
+        Paragraph(f"Opening balance: {money(shown['opening_balance_aed'])} AED", s["body"]),
     ]
-    for month in months:
-        entries = [
-            (1, c["description"], Decimal(c["amount_aed"]), None) for c in shown["income_credits"]
-        ]
-        entries += [
-            (5, p["description"], None, Decimal(p["amount_aed"])) for p in shown["monthly_payments"]
-        ]
-        entries += [
-            (10, "Utilities - Oasis Power and Water (Demo)", None, Decimal(rng.randint(250, 900))),
-            (
-                15,
-                "Groceries - Spice Route Supermarket (Demo)",
-                None,
-                Decimal(rng.randint(300, 1500)),
-            ),
-            (25, "Groceries - Palm Leaf Retail (Demo)", None, Decimal(rng.randint(200, 1200))),
-        ]
+    for month in shown["months"]:
         rows = [["Date", "Description", "Credit (AED)", "Debit (AED)", "Balance (AED)"]]
-        for day, description, credit, debit in entries:
-            balance += (credit or 0) - (debit or 0)
+        for t in month["transactions"]:
             rows.append(
                 [
-                    date(month.year, month.month, day).isoformat(),
-                    description,
-                    money(credit) if credit else "",
-                    money(debit) if debit else "",
-                    money(balance),
+                    t["date"],
+                    t["description"],
+                    money(t["credit_aed"]) if t["credit_aed"] else "",
+                    money(t["debit_aed"]) if t["debit_aed"] else "",
+                    money(t["balance_aed"]),
                 ]
             )
         story += [
             Spacer(1, 6),
-            Paragraph(month.strftime("%B %Y"), s["h2"]),
+            Paragraph(date.fromisoformat(month["month"]).strftime("%B %Y"), s["h2"]),
             table(rows, [22, 78, 26, 26, 28]),
             Paragraph(
                 f"Total credits: {money(shown['monthly_income_credits_aed'])} AED. "
-                f"Closing balance: {money(balance)} AED.",
+                f"Closing balance: {money(month['closing_balance_aed'])} AED.",
                 s["small"],
             ),
         ]

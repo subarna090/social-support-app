@@ -50,6 +50,11 @@ def shown_values_appear(folder: Path, key: dict) -> list[str]:
     expect(bank, money(Decimal(b["monthly_income_credits_aed"])), "bank_statement")
     for credit in b["income_credits"]:
         expect(bank, money(Decimal(credit["amount_aed"])), "bank_statement")
+    for month in b["months"]:  # T048: every transaction and closing balance is in the answer key
+        expect(bank, money(Decimal(month["closing_balance_aed"])), "bank_statement")
+        for t in month["transactions"]:
+            expect(bank, t["description"], "bank_statement")
+            expect(bank, money(Decimal(t["balance_aed"])), "bank_statement")
 
     resume = pdf_text(folder / "resume.pdf")
     r = docs["resume"]
