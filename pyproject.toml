@@ -13,10 +13,19 @@ dependencies = [
     "streamlit>=1.38",
     "httpx>=0.27",
     "python-dotenv>=1.2",
+    "faker>=40.43.0",
+    "reportlab>=5.1.0",
+    "openpyxl>=3.1.5",
+    "pillow>=13.0.0",
+    "pandas>=3.1.0",
 ]
+
+[project.scripts]
+social-support-data = "social_support.synthetic.cli:main"
 
 [dependency-groups]
 dev = [
+    "pypdf>=6.21.2",
     "pytest>=8.2",
     "ruff>=0.6",
 ]
@@ -41,6 +50,8 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Header"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = ["slow: long-running volume and timing tests (SC-001, SC-003, SC-004)"]
+addopts = "-m 'not slow'"
 filterwarnings = [
     # Starlette's TestClient nudges towards httpx2; httpx is still fully supported.
     "ignore:Using `httpx` with `starlette.testclient` is deprecated",

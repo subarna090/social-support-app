@@ -21,6 +21,8 @@ ALLOWED_EXTRA_KEYS = (
     "error_type",
     "path",
     "fields",  # names of fields that failed validation, never their values
+    "run_id",  # synthetic generator (feature 002): run and pack identifiers, never personal data
+    "pack_id",
 )
 
 

@@ -1,0 +1,62 @@
+# Eligibility labelling policy v1 (feature 002, research R3).
+#
+# Rules are evaluated top to bottom; the FIRST rule whose conditions all hold decides the outcome.
+# A later rule therefore only sees households that matched none of the earlier rules. For example,
+# `low_income_not_in_work` only sees households with income per member below 2000.00 AED, no active
+# defaults, a credit score of 550 or more and net wealth of 500000.00 AED or less.
+#
+# Factors are HouseholdFacts fields. Protected attributes are not available here (FR-012).
+# Income-per-member thresholds match the 001 placeholder rule (2000 / 2500 AED).
+# Any edit to this file, including comments, produces a new policy version id.
+
+name = "eligibility"
+version = "v1"
+description = "Eligibility labels for synthetic applicant packs (feature 002)."
+
+[[rules]]
+id = "high_net_wealth"
+outcome = "SOFT_DECLINE"
+reason = "Net wealth of {net_wealth_aed} AED is above the 500000.00 AED limit."
+conditions = [{ factor = "net_wealth_aed", op = "gt", value = 500000 }]
+
+[[rules]]
+id = "income_above_band"
+outcome = "SOFT_DECLINE"
+reason = "Income per member of {income_per_member_aed} AED is above the 2500.00 AED band."
+conditions = [{ factor = "income_per_member_aed", op = "gt", value = 2500 }]
+
+[[rules]]
+id = "active_credit_defaults"
+outcome = "NEEDS_HUMAN_REVIEW"
+reason = "The credit report shows {active_credit_defaults} active default(s); a caseworker should review."
+conditions = [{ factor = "active_credit_defaults", op = "ge", value = 1 }]
+
+[[rules]]
+id = "poor_credit_score"
+outcome = "NEEDS_HUMAN_REVIEW"
+reason = "A credit score of {credit_score} is below 550; a caseworker should review."
+conditions = [{ factor = "credit_score", op = "lt", value = 550 }]
+
+[[rules]]
+id = "borderline_income"
+outcome = "NEEDS_HUMAN_REVIEW"
+reason = "Income per member of {income_per_member_aed} AED is in the 2000.00-2500.00 AED borderline band."
+conditions = [{ factor = "income_per_member_aed", op = "ge", value = 2000 }]
+
+[[rules]]
+id = "low_income_not_in_work"
+outcome = "APPROVE"
+reason = "Income per member of {income_per_member_aed} AED is below 2000.00 AED and the applicant is {employment_status}."
+conditions = [{ factor = "employment_status", op = "in", value = ["UNEMPLOYED", "STUDENT", "RETIRED"] }]
+
+[[rules]]
+id = "low_income_stable_work"
+outcome = "APPROVE"
+reason = "Income per member of {income_per_member_aed} AED is below 2000.00 AED and the applicant worked {months_employed_last_24} of the last 24 months."
+conditions = [{ factor = "months_employed_last_24", op = "ge", value = 12 }]
+
+[[rules]]
+id = "unstable_work_history"
+outcome = "NEEDS_HUMAN_REVIEW"
+reason = "Income per member is below 2000.00 AED but the applicant worked only {months_employed_last_24} of the last 24 months."
+conditions = []

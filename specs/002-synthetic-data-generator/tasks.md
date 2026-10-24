@@ -29,21 +29,21 @@ tested on its own.
 
 **Purpose**: dependencies, entry point, package skeleton
 
-- [ ] T001 Update `pyproject.toml` (research R12, R13, R14):
+- [X] T001 Update `pyproject.toml` (research R12, R13, R14):
   - Add runtime dependencies with `uv add faker reportlab openpyxl pillow pandas`, and the dev
     dependency with `uv add --dev pypdf`.
   - Add `[project.scripts] social-support-data = "social_support.synthetic.cli:main"`.
   - In `[tool.pytest.ini_options]`, add `markers = ["slow: long-running timing tests (SC-001)"]` and
     `addopts = "-m 'not slow'"`.
   - Run `uv sync` and confirm that `uv run python -c "import faker, reportlab, openpyxl, PIL, pandas, pypdf"` succeeds.
-- [ ] T002 Create the package skeleton from plan.md:
+- [X] T002 Create the package skeleton from plan.md:
   - `src/social_support/labelling/{__init__.py,facts.py,policy.py}` and
     `src/social_support/labelling/policies/`.
   - `src/social_support/synthetic/{__init__.py,__main__.py}`, `src/social_support/synthetic/documents/__init__.py`,
     `src/social_support/synthetic/data/`.
   - `tests/e2e/__init__.py`.
   - `synthetic/__init__.py` defines `GENERATOR_VERSION = "0.1.0"`. `__main__.py` calls `cli.main()`.
-- [ ] T003 Confirm that `.gitignore` already ignores `data/`, so `data/synthetic/` is ignored
+- [X] T003 Confirm that `.gitignore` already ignores `data/`, so `data/synthetic/` is ignored
   (FR-018). Run `git check-ignore data/synthetic/x` and expect a match; add `data/` only if it is
   missing.
 
@@ -58,7 +58,7 @@ story depends on these.
 
 ### Labelling policy (test-first, Principle V)
 
-- [ ] T004 [P] Write `tests/unit/test_labelling_policy.py` against
+- [X] T004 [P] Write `tests/unit/test_labelling_policy.py` against
   [contracts/labelling-policy.md](./contracts/labelling-policy.md) and research R3. Confirm it
   fails. It covers:
   - **One boundary pair per rule**, each with otherwise neutral facts:
@@ -80,7 +80,7 @@ story depends on these.
   - **Invalid files** written to `tmp_path`: each `PolicyError` message from the contract table (no
     rules, duplicate id, unknown outcome, unknown factor, unknown operator, default rule not last or
     missing, unknown placeholder).
-- [ ] T005 [P] Implement `HouseholdFacts` in `src/social_support/labelling/facts.py` (data-model
+- [X] T005 [P] Implement `HouseholdFacts` in `src/social_support/labelling/facts.py` (data-model
   HouseholdFacts). It is a frozen dataclass with exactly these fields: `family_size` (int ≥ 1),
   `net_monthly_income_aed` (Decimal ≥ 0), `income_per_member_aed` (Decimal, 2 dp),
   `employment_status` (`domain.models.EmploymentStatus`), `months_employed_last_24` (int 0–24),
@@ -88,7 +88,7 @@ story depends on these.
   (Decimal), `credit_score` (int 300–900) and `active_credit_defaults` (int ≥ 0). `__post_init__`
   raises `ValueError` on out-of-range values. Add a `HouseholdFacts.build(...)` classmethod that
   derives `income_per_member_aed` (ROUND_HALF_UP to 2 dp) and `net_wealth_aed`.
-- [ ] T006 Implement `src/social_support/labelling/policy.py`:
+- [X] T006 Implement `src/social_support/labelling/policy.py`:
   - `PolicyError`, `Condition`, `Rule`, `LabellingPolicy`, `LabelResult` (data-model) and
     `load_policy(name="eligibility", version="v1", path=None)`.
   - Read the file with `tomllib`, from package data through `importlib.resources` unless a `path`
@@ -100,14 +100,14 @@ story depends on these.
   - Export `load_policy`, `HouseholdFacts`, `LabelResult` and `PolicyError` from
     `labelling/__init__.py`.
   - Depends on T005.
-- [ ] T007 Create `src/social_support/labelling/policies/eligibility_v1.toml` with the 8 ordered
+- [X] T007 Create `src/social_support/labelling/policies/eligibility_v1.toml` with the 8 ordered
   rules, ids, outcomes, conditions and reason templates from research R3. Add a header comment
   explaining first-match-wins and that later rules inherit the negation of earlier ones. T004 then
   passes.
 
 ### Architecture guards
 
-- [ ] T008 Extend `tests/unit/test_architecture.py` (research R1, Constitution IV):
+- [X] T008 Extend `tests/unit/test_architecture.py` (research R1, Constitution IV):
   - `labelling` may import only `social_support.domain` and the standard library. Assert that it
     imports none of `faker`, `reportlab`, `PIL`, `openpyxl`, `pandas`, `httpx`, `sqlalchemy`,
     `fastapi`, `streamlit`, or `social_support.{persistence,services,api,ui,assessment,synthetic}`.
@@ -121,7 +121,7 @@ story depends on these.
 
 ### Identities and household profile
 
-- [ ] T009 [P] Write `tests/unit/test_identities.py` (research R6, FR-016) and confirm it fails. It
+- [X] T009 [P] Write `tests/unit/test_identities.py` (research R6, FR-016) and confirm it fails. It
   covers:
   - `emirates_id(birth_year, pack_index)` returns `784-YYYY-00NNNNN-C`, where `YYYY` is the birth
     year and `NNNNN` is the pack index zero-padded (pack 1 gives `784-1990-0000001-0`).
@@ -132,13 +132,13 @@ story depends on these.
   - Emails end with `@example.com`; phones match `+971 50 000 NNNN`.
   - Addresses use a district from `names.toml`.
   - The same seed gives the same identities.
-- [ ] T010 [P] Create `src/social_support/synthetic/data/names.toml`, all fictional:
+- [X] T010 [P] Create `src/social_support/synthetic/data/names.toml`, all fictional:
   - Curated Arabic given and family names written in English letters (at least 30 of each).
   - Fictional districts (at least 15) and street patterns, plus the 7 emirate names.
   - Fictional employers (at least 25, each with "(Demo)" in the name), bank name
     `Desert Falcon Demo Bank`, bureau name `Demo Credit Information Bureau`.
   - Universities and job titles.
-- [ ] T011 Implement `src/social_support/synthetic/identities.py` (research R6) and make T009 pass.
+- [X] T011 Implement `src/social_support/synthetic/identities.py` (research R6) and make T009 pass.
   - `IdentityFactory(rng, faker_locales=("en_GB","en_IN","en_PH"))` mixes Faker names with the
     curated list.
   - `emirates_id(birth_year, pack_index)` builds the serial as `00` plus the pack index padded to 5
@@ -146,7 +146,7 @@ story depends on these.
     stateless, so there is no "used numbers" tracking.
   - Also provides `address()`, `email(name)`, `phone()` and `employer()`.
   - Depends on T010.
-- [ ] T012 [P] Write the profile part of `tests/unit/test_profile_sampler.py` (data-model
+- [X] T012 [P] Write the profile part of `tests/unit/test_profile_sampler.py` (data-model
   HouseholdProfile invariants) and confirm it fails. It covers:
   - `family_size == 1 + len(members)`.
   - `active_credit_defaults` equals the number of DEFAULT accounts.
@@ -158,7 +158,7 @@ story depends on these.
   - Spec edge cases are reachable: over 500 naturally sampled profiles there is at least one with
     family size 1, one with family size 10 or more, one with zero income, and one whose income is
     only from non-salary sources.
-- [ ] T013 Implement `src/social_support/synthetic/profile.py` and make T012 pass.
+- [X] T013 Implement `src/social_support/synthetic/profile.py` and make T012 pass.
   - The `HouseholdProfile` dataclasses (identity, contact, members, jobs, income sources, assets,
     liabilities, credit accounts) as in data-model.
   - `sample_profile(rng, identities, as_of)` uses base priors: family size 1–10 (10 or more
@@ -184,7 +184,7 @@ reproducibly.
 
 ### Tests for User Story 1 (write first, confirm they fail)
 
-- [ ] T014 [P] [US1] Write `tests/integration/test_generate_batch.py` (FR-001–FR-005, FR-016,
+- [X] T014 [P] [US1] Write `tests/integration/test_generate_batch.py` (FR-001–FR-005, FR-016,
   FR-017, SC-003, SC-006). Call `run.generate(GenerationRequest(count=10, seed=42, output_root=tmp_path))`
   and assert:
   - The layout from [contracts/pack-format.md](./contracts/pack-format.md) exists: `run.json`, and
@@ -211,13 +211,13 @@ reproducibly.
     `tests/integration/pack_checks.py`, so they can run at volume. Add
     `tests/integration/test_large_batch.py`, marked `@pytest.mark.slow`, which runs them over 200
     consistent packs (SC-003).
-- [ ] T015 [P] [US1] Write `tests/integration/test_determinism.py` (FR-006, SC-002, research R5):
+- [X] T015 [P] [US1] Write `tests/integration/test_determinism.py` (FR-006, SC-002, research R5):
   - Generate seed 42 with count 5 into two different roots.
   - `form.json`, `answer_key.json`, PDFs and PNGs are byte-identical; xlsx cell values are
     identical; `run.json` is identical apart from `generated_at`.
   - Seed 43 differs.
   - The run id is `s42-n5-<6 hex>` and is the same for both runs.
-- [ ] T016 [P] [US1] Write `tests/integration/test_cli.py` for `generate` (contracts/cli.md),
+- [X] T016 [P] [US1] Write `tests/integration/test_cli.py` for `generate` (contracts/cli.md),
   calling `cli.main([...])` with `capsys`:
   - Success prints the summary lines and exits 0. The output contains no name, Emirates ID or
     income from the generated packs.
@@ -228,7 +228,7 @@ reproducibly.
 
 ### Implementation for User Story 1
 
-- [ ] T017 [US1] Implement `src/social_support/synthetic/documents/common.py`:
+- [X] T017 [US1] Implement `src/social_support/synthetic/documents/common.py`:
   - `MARKING = "SYNTHETIC – NOT A REAL DOCUMENT"`.
   - Helpers that draw a diagonal marking and a footer on every reportlab page.
   - `money(Decimal) -> "6,000.00"` and `month_label(date)`.
@@ -236,7 +236,7 @@ reproducibly.
     holds every field the document displays, in canonical form (money `"6000.00"`, dates
     `YYYY-MM-DD`), and goes into `answer_key.documents`. `field_boxes` is used only by the ID card,
     for tests, and is never written to the answer key.
-- [ ] T018 [P] [US1] Implement `src/social_support/synthetic/documents/bank_statement.py` (research
+- [X] T018 [P] [US1] Implement `src/social_support/synthetic/documents/bank_statement.py` (research
   R7):
   - reportlab platypus with `invariant=1`, `Desert Falcon Demo Bank`, an account holder block.
   - 3–6 months of transactions before `as_of`: monthly credits for each income source, and debits
@@ -244,15 +244,15 @@ reproducibly.
   - A closing balance per month.
   - `shown` includes `account_holder`, `monthly_salary_credit_aed` (or the other income credits)
     and `statement_months`.
-- [ ] T019 [P] [US1] Implement `src/social_support/synthetic/documents/resume.py`: reportlab with
+- [X] T019 [P] [US1] Implement `src/social_support/synthetic/documents/resume.py`: reportlab with
   `invariant=1`; contact, summary, employment history (employer, title, start and end month), education
   and skills. `shown` includes `full_name`, `current_employer` and `jobs`.
-- [ ] T020 [P] [US1] Implement `src/social_support/synthetic/documents/credit_report.py`:
+- [X] T020 [P] [US1] Implement `src/social_support/synthetic/documents/credit_report.py`:
   reportlab with `invariant=1`; `Demo Credit Information Bureau`; subject name, Emirates ID, address
   on file, a "Household members on file" table (name, relationship, age), credit score, an open
   accounts table (lender, kind, balance, status) and the number of active defaults. `shown` includes
   those fields, with `household_members` as a list.
-- [ ] T021 [P] [US1] Implement `src/social_support/synthetic/documents/emirates_id.py` (research R7):
+- [X] T021 [P] [US1] Implement `src/social_support/synthetic/documents/emirates_id.py` (research R7):
   - A 1012×638 PNG drawn with Pillow, with no metadata.
   - Titled "MOCK RESIDENT IDENTITY CARD", with a grey silhouette instead of a photo.
   - Shows name, ID number, nationality, date of birth, sex and expiry.
@@ -260,12 +260,12 @@ reproducibly.
   - `ImageFont.load_default(size=...)` only; no emblems or official titles.
   - Return `field_boxes`: the bounding box of each drawn field (name, ID number, nationality, date
     of birth, sex, expiry), for tests only.
-- [ ] T022 [P] [US1] Implement `src/social_support/synthetic/documents/assets_liabilities.py`:
+- [X] T022 [P] [US1] Implement `src/social_support/synthetic/documents/assets_liabilities.py`:
   - openpyxl sheets `Assets`, `Liabilities` and `Summary`.
   - Totals and net wealth stored as values, not formulas (research R7).
   - `MARKING` in A1 of each sheet; workbook created and modified dates set to `as_of`.
   - `shown` includes `total_assets_aed`, `total_liabilities_aed` and `net_wealth_aed`.
-- [ ] T023 [US1] Implement `src/social_support/synthetic/pack.py`:
+- [X] T023 [US1] Implement `src/social_support/synthetic/pack.py`:
   - `ApplicantPack` (data-model) and `build_pack(pack_id, profile, policy, as_of, inconsistency=None)`.
   - Builds `form` (the full FR-002 fields plus the `submission` block in the exact 001 payload
     shape) and labels with `policy.evaluate(to_facts(...))`.
@@ -274,7 +274,7 @@ reproducibly.
     `answer_key.json` in the format from [contracts/pack-format.md](./contracts/pack-format.md),
     with sorted keys, 2-space indent and money as 2-dp strings.
   - Depends on T013 and T017–T022.
-- [ ] T024 [US1] Implement `src/social_support/synthetic/run.py`:
+- [X] T024 [US1] Implement `src/social_support/synthetic/run.py`:
   - `GenerationRequest` with the data-model constraints verbatim: `count` 1–5000, `seed` ≥ 0,
     `inconsistency_rate_pct` 0–100 (default 0), `inconsistency_types` a non-empty subset (default
     all), `outcome_mix_pct` none or three integers summing to 100, `as_of` defaulting to
@@ -290,7 +290,7 @@ reproducibly.
     incomes. Add a test in `tests/integration/test_generate_batch.py` that captures the log
     records: `run_id` and `pack_id` appear, and no generated name, Emirates ID or income does.
   - Depends on T023.
-- [ ] T025 [US1] Implement `src/social_support/synthetic/cli.py`:
+- [X] T025 [US1] Implement `src/social_support/synthetic/cli.py`:
   - `main(argv=None) -> int` with argparse subcommand `generate` taking `--count`, `--seed`,
     `--as-of`, `--out` and `--overwrite`. Accept but defer `--inconsistency-rate`,
     `--inconsistency-types` and `--outcome-mix` until US2/US3, which wire them in.
@@ -572,3 +572,23 @@ T026 | T027 | T032 | T033 | T034 | T039 | T040
 - Every task maps to an FR, an SC or a research decision, so `/speckit-analyze` can check coverage.
 - Synthetic data only (Constitution I). Generated output goes under `data/synthetic/`, which is
   git-ignored, and never into `tests/fixtures/`. Tests generate into `tmp_path`.
+
+### Implementation notes (recorded at the US1 checkpoint, 2026-10-24)
+
+- **Test-first:** every test file (T004, T009, T012, T014–T016) was run red before its
+  implementation. Architecture guards (T008) were mutation-checked by planting a forbidden import in
+  `labelling`, `synthetic` and `api`; each was caught.
+- **Windows rename retry:** the first real CLI run failed renaming the `.partial` folder into place
+  (`PermissionError: [WinError 5] Access is denied`), because a scanner briefly held the new files.
+  Tests on `tmp_path` never hit this. `run._rename_with_retry` retries for about 5 s; a regression
+  test fakes two failures.
+- **ID card en dash:** Pillow's bundled font has no en dash glyph, so the banner showed an empty box.
+  Found by opening the PNG, not by tests. The image draws `SYNTHETIC - NOT A REAL DOCUMENT` with a
+  plain hyphen; PDFs and xlsx keep the en dash.
+- **Real names removed:** a utility debit first used a real utility company's acronym; replaced with
+  the invented "Oasis Power and Water (Demo)" (FR-017).
+- **Options for later stories:** `--inconsistency-rate` and `--outcome-mix` are validated now (so
+  the contract's error messages are tested in US1) but generation raises "arrives in US2 and US3"
+  (exit 1) until those phases wire them in. No test needed a skip marker.
+- **Natural outcome mix:** seed 42 × 10 packs gave APPROVE 4, SOFT_DECLINE 6, NEEDS_HUMAN_REVIEW 0.
+  The base priors lean towards higher incomes; US3's outcome-targeted sampling controls the mix.
