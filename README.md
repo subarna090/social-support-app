@@ -7,11 +7,13 @@ cases.
 
 > **Synthetic data only.** Never enter real personal information.
 
-**Status:** feature 001 (walking skeleton). An application form leads to a stored, explained
-decision, which can be looked up later. Borderline cases go to a caseworker review queue. The
-assessment is a placeholder income-per-member rule behind an `Assessor` interface. Later features
-replace it with document ingestion, an ML classifier, and LLM agents running on local models
-(Ollama).
+**Status:** features 001 (walking skeleton) and 002 (synthetic data generator). An application
+form leads to a stored, explained decision, which can be looked up later. Borderline cases go to a
+caseworker review queue. The assessment is a placeholder income-per-member rule behind an
+`Assessor` interface. A generator produces fictional applicant packs with documents and labelled
+outcomes (see [Synthetic data](#synthetic-data)). Later features replace the rule with document
+ingestion, an ML classifier, and LLM agents running on local models (Ollama). See
+[ROADMAP.md](ROADMAP.md) for the planned features.
 
 The project is built spec-first with [GitHub Spec Kit](https://github.com/github/spec-kit). See
 [How this project is built](#how-this-project-is-built).
@@ -54,7 +56,8 @@ The UI has three tabs:
 ## Test
 
 ```powershell
-uv run pytest                                   # everything (unit, contract, integration, UI)
+uv run pytest                                   # everything except slow tests (about 1 minute)
+uv run pytest -m slow                           # 200-pack volume checks and the 100-pack timing test
 uv run pytest tests/unit -q                     # fast: validation, rule boundaries, architecture
 uv run pytest tests/integration/test_lookup_flow.py::test_mismatched_id_and_unknown_reference_both_return_404
 uv run ruff check . ; uv run ruff format --check .
@@ -76,6 +79,36 @@ uv run ruff check . ; uv run ruff format --check .
 
 The full validation guide, including the audit trail and rule-change checks, is in
 [specs/001-application-walking-skeleton/quickstart.md](specs/001-application-walking-skeleton/quickstart.md).
+
+## Synthetic data
+
+Feature 002 generates fictional applicant packs for tests, demos and model training. Each pack has
+the application form details, five documents (bank statement, resume and credit report as PDFs, an
+ID card image, an assets and liabilities spreadsheet) and an answer key with the true values.
+
+```powershell
+uv run social-support-data generate --count 10 --seed 42                  # consistent packs
+uv run social-support-data generate --count 100 --seed 7 --inconsistency-rate 30 --inconsistency-types income
+uv run social-support-data generate --count 500 --seed 11 --outcome-mix 40,40,20   # training set
+uv run social-support-data seed --run data/synthetic/<run-id> --limit 10   # submit to the running API
+```
+
+- **Output:** `data/synthetic/<run-id>/` with `run.json`, `summary.csv` (one row per pack) and
+  `packs/pack-NNNN/`. The same count, seed and settings always give the same files; an existing
+  run is only replaced with `--overwrite`.
+- **Two labels per pack:** the *eligibility outcome* comes from the household's true facts through
+  the versioned labelling policy (`src/social_support/labelling/policies/eligibility_v1.toml`, an
+  ordered list of rules where the first match wins). The *expected routing* is Needs Human Review
+  when an inconsistency was injected, otherwise the eligibility outcome.
+- **Inconsistencies:** `income`, `address`, `family_size`, `identity`, `employment`. At most one
+  per pack, recorded in its answer key with the true and the altered value.
+- **Privacy:** everything is fictional. Documents carry a "SYNTHETIC – NOT A REAL DOCUMENT" marking,
+  organisations are invented, emails use `example.com`, and Emirates ID serials start with `00`
+  (a reserved block). Output is git-ignored. Nationality and gender appear in `summary.csv` only as
+  `audit_` columns, for fairness evaluation, never as model inputs.
+
+Formats: [specs/002-synthetic-data-generator/contracts/](specs/002-synthetic-data-generator/contracts/).
+Validation guide: [specs/002-synthetic-data-generator/quickstart.md](specs/002-synthetic-data-generator/quickstart.md).
 
 ## Architecture
 

@@ -65,3 +65,62 @@ def test_decision_logic_does_not_depend_on_outer_layers(package):
 def test_assessors_cannot_see_identity():
     fields = {f.name for f in dataclasses.fields(ApplicationInput)}
     assert fields == {"family_size", "net_monthly_income_aed", "employment_status"}
+
+
+# --- feature 002: labelling and synthetic (research R1) ---------------------------------------
+
+THIRD_PARTY = (
+    "faker",
+    "reportlab",
+    "PIL",
+    "openpyxl",
+    "pandas",
+    "httpx",
+    "sqlalchemy",
+    "fastapi",
+    "streamlit",
+)
+
+
+def test_labelling_is_pure():
+    # Feature 005 reuses the policy, so it must not drag in renderers, storage or web frameworks.
+    inner = tuple(
+        f"social_support.{p}"
+        for p in ("persistence", "services", "api", "ui", "assessment", "synthetic", "config")
+    )
+    assert _violations("labelling", THIRD_PARTY + inner) == []
+
+
+def test_synthetic_reaches_the_app_only_over_http():
+    forbidden = (
+        "social_support.api",
+        "social_support.persistence",
+        "social_support.assessment",
+        "social_support.services.applications",
+    )
+    assert _violations("synthetic", forbidden) == []
+
+
+@pytest.mark.parametrize("package", ["api", "ui"])
+def test_app_does_not_depend_on_the_generator(package):  # FR-021: no new screen or endpoint
+    assert _violations(package, ("social_support.synthetic",)) == []
+
+
+def test_labelling_facts_exclude_identity_and_protected_attributes():
+    from social_support.labelling import HouseholdFacts
+
+    names = {f.name for f in dataclasses.fields(HouseholdFacts)}
+    assert names == {
+        "family_size",
+        "net_monthly_income_aed",
+        "income_per_member_aed",
+        "employment_status",
+        "months_employed_last_24",
+        "total_assets_aed",
+        "total_liabilities_aed",
+        "net_wealth_aed",
+        "credit_score",
+        "active_credit_defaults",
+    }
+    protected = {"nationality", "gender", "religion", "ethnicity", "marital_status"}
+    assert not names & (protected | {"full_name", "emirates_id"})
