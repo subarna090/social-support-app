@@ -32,6 +32,13 @@ def test_run_id_is_deterministic(runs):
     assert first.run_id == second.run_id
 
 
+def test_summary_is_byte_identical(runs):
+    first, second, _ = runs
+    assert (first.folder / "summary.csv").read_bytes() == (
+        second.folder / "summary.csv"
+    ).read_bytes()
+
+
 def test_files_are_byte_identical(runs):
     first, second, _ = runs
     for index in range(1, 6):

@@ -103,3 +103,79 @@ def test_constraints_force_income_and_employment():  # T029
 
 def test_unconstrained_sampling_is_unchanged_by_the_constraint_option():
     assert sample(42, 7) == sample_profile(pack_rng(42, 7), AS_OF, pack_index=7)
+
+
+# --- US3: outcome-targeted sampling (T033) -----------------------------------------------------
+
+from social_support.domain.models import Outcome  # noqa: E402
+from social_support.labelling import load_policy  # noqa: E402
+from social_support.synthetic.allocation import assign_targets, quotas  # noqa: E402
+from social_support.synthetic.profile import SamplingError, sample_with_attempts  # noqa: E402
+
+POLICY = load_policy()
+
+
+@pytest.mark.parametrize("target", list(Outcome))
+def test_targeted_profiles_get_the_target_label(target):
+    for index in range(1, 41):
+        p = sample_profile(
+            pack_rng(21, index), AS_OF, pack_index=index, target=target, policy=POLICY
+        )
+        assert POLICY.evaluate(to_facts(p, AS_OF)).outcome is target
+
+
+def test_500_targeted_profiles_meet_the_mix_exactly_with_few_attempts():  # SC-005
+    import random
+    from collections import Counter
+
+    targets = assign_targets(
+        random.Random(1),
+        quotas(
+            500,
+            {
+                "APPROVE": 40,
+                "SOFT_DECLINE": 40,
+                "NEEDS_HUMAN_REVIEW": 20,
+            },
+        ),
+    )
+    labels, attempts = Counter(), 0
+    for index, target in enumerate(targets, 1):
+        p, n = sample_with_attempts(pack_rng(9, index), AS_OF, index, target=target, policy=POLICY)
+        labels[POLICY.evaluate(to_facts(p, AS_OF)).outcome] += 1
+        attempts += n
+    assert labels == {
+        Outcome.APPROVE: 200,
+        Outcome.SOFT_DECLINE: 200,
+        Outcome.NEEDS_HUMAN_REVIEW: 100,
+    }
+    assert attempts / 500 < 5
+
+
+def test_unreachable_target_raises_sampling_error(tmp_path):
+    path = tmp_path / "always_decline.toml"
+    path.write_text(
+        'name = "eligibility"\nversion = "v0"\n[[rules]]\nid = "all"\noutcome = "SOFT_DECLINE"\n'
+        'reason = "x"\nconditions = []\n',
+        encoding="utf-8",
+    )
+    from social_support.labelling import load_policy as load
+
+    with pytest.raises(SamplingError, match="APPROVE"):
+        sample_profile(
+            pack_rng(1, 1), AS_OF, pack_index=1, target=Outcome.APPROVE, policy=load(path=path)
+        )
+
+
+def test_target_combines_with_employment_constraint():
+    for index in range(1, 21):
+        p = sample_profile(
+            pack_rng(4, index),
+            AS_OF,
+            pack_index=index,
+            target=Outcome.APPROVE,
+            policy=POLICY,
+            requires_employment=True,
+        )
+        assert p.employment_status in WORKING
+        assert POLICY.evaluate(to_facts(p, AS_OF)).outcome is Outcome.APPROVE

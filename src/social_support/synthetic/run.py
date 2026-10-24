@@ -19,6 +19,8 @@ from social_support.domain.models import Outcome
 from social_support.labelling import LabellingPolicy, load_policy
 from social_support.services.tracing import LOGGER_NAME
 from social_support.synthetic import GENERATOR_VERSION
+from social_support.synthetic.allocation import assign_targets, quotas
+from social_support.synthetic.dataset import summary_row, write_summary
 from social_support.synthetic.inconsistencies import InconsistencyType, inject, select_slots
 from social_support.synthetic.pack import FORMAT, build_pack, write_pack
 from social_support.synthetic.profile import pack_rng, sample_profile
@@ -106,8 +108,6 @@ def check(request: GenerationRequest) -> None:
         raise RequestError(
             f"output already exists: {request.folder} (use --overwrite to replace it)"
         )
-    if request.outcome_mix_pct:
-        raise NotImplementedError("outcome mixes arrive in US3")
 
 
 def _rename_with_retry(source: Path, target: Path, attempts: int = 20) -> None:
@@ -139,10 +139,16 @@ def generate(request: GenerationRequest, policy: LabellingPolicy | None = None) 
         if request.inconsistency_rate_pct
         else {}
     )
+    targets = (
+        assign_targets(master, quotas(request.count, request.outcome_mix_pct))
+        if request.outcome_mix_pct
+        else [None] * request.count
+    )
     try:
         eligibility: Counter[str] = Counter()
         routing: Counter[str] = Counter()
         injected: Counter[str] = Counter()
+        rows: list[dict] = []
         for index in range(1, request.count + 1):
             rng = pack_rng(request.seed, index)
             kind = slots.get(index)
@@ -150,6 +156,8 @@ def generate(request: GenerationRequest, policy: LabellingPolicy | None = None) 
                 rng,
                 request.as_of,
                 pack_index=index,
+                target=targets[index - 1],
+                policy=policy,
                 requires_income=kind is InconsistencyType.INCOME_MISMATCH,
                 requires_employment=kind is InconsistencyType.EMPLOYMENT_MISMATCH,
             )
@@ -160,6 +168,7 @@ def generate(request: GenerationRequest, policy: LabellingPolicy | None = None) 
             write_pack(pack, temp / "packs" / pack.pack_id, run_id, request.as_of, rng)
             eligibility[pack.label.outcome.value] += 1
             routing[pack.expected_routing.value] += 1
+            rows.append(summary_row(pack))
             logger.info("pack generated", extra={"run_id": run_id, "pack_id": pack.pack_id})
 
         counts = {
@@ -179,6 +188,7 @@ def generate(request: GenerationRequest, policy: LabellingPolicy | None = None) 
             "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "counts": counts,
         }
+        write_summary(temp, rows)
         (temp / "run.json").write_text(
             json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
         )

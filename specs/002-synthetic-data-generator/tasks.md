@@ -379,19 +379,19 @@ matches the answer keys, and has the requested outcome counts.
 
 ### Tests for User Story 3
 
-- [ ] T032 [P] [US3] Write `tests/unit/test_allocation.py` (FR-013, research R4, edge case on
+- [X] T032 [P] [US3] Write `tests/unit/test_allocation.py` (FR-013, research R4, edge case on
   rounding) and confirm it fails. It covers:
   - Largest-remainder quotas sum to `count`, and each differs from the exact share by less than 1.
   - Examples: 10 packs at 33/33/34 gives 3/3/4; 500 at 40/40/20 gives 200/200/100; a 0% outcome
     gives 0.
   - The slot order is deterministic for a given seed.
-- [ ] T033 [P] [US3] Extend `tests/unit/test_profile_sampler.py` (SC-005) and confirm it fails:
+- [X] T033 [P] [US3] Extend `tests/unit/test_profile_sampler.py` (SC-005) and confirm it fails:
   - For each target outcome, `sample_profile(..., target=outcome)` labels to that outcome.
   - 500 sampled profiles (no rendering) with mix 40/40/20 give exactly 200/200/100.
   - The average attempts per pack stay under 5, and the cap of 200 attempts raises `SamplingError`
     naming the outcome (force this with an unsatisfiable `tmp_path` policy).
   - `target=APPROVE` combined with `requires_employment=True` still succeeds.
-- [ ] T034 [P] [US3] Write `tests/integration/test_dataset.py` (FR-014, US3 scenarios 1–4,
+- [X] T034 [P] [US3] Write `tests/integration/test_dataset.py` (FR-014, US3 scenarios 1–4,
   [contracts/pack-format.md](./contracts/pack-format.md#summarycsv)). Generate 30 packs with mix
   40,40,20 and 20% inconsistencies, then assert:
   - `summary.csv` has 30 rows in pack id order, with the exact column list and order from the
@@ -404,11 +404,11 @@ matches the answer keys, and has the requested outcome counts.
 
 ### Implementation for User Story 3
 
-- [ ] T035 [US3] Implement `src/social_support/synthetic/allocation.py`: `quotas(count, mix_pct)`
+- [X] T035 [US3] Implement `src/social_support/synthetic/allocation.py`: `quotas(count, mix_pct)`
   using the largest-remainder method (ties broken in the order APPROVE, SOFT_DECLINE,
   NEEDS_HUMAN_REVIEW), and `assign_targets(rng, quotas) -> list[Outcome]`, shuffled with the run's
   random generator.
-- [ ] T036 [US3] Add outcome-targeted sampling to `src/social_support/synthetic/profile.py`
+- [X] T036 [US3] Add outcome-targeted sampling to `src/social_support/synthetic/profile.py`
   (research R4):
   - Priors tuned per target outcome: for example, APPROVE draws low income per member, no
     defaults, a score of 550 or more and modest wealth; SOFT_DECLINE draws high income per member
@@ -417,11 +417,11 @@ matches the answer keys, and has the requested outcome counts.
   - Rejection loop: label with the policy and retry until the label matches, at most 200 attempts,
     then raise `SamplingError`.
   - The label always comes from `policy.evaluate`, never from the target.
-- [ ] T037 [US3] Implement `src/social_support/synthetic/dataset.py`: `write_summary(run_folder,
+- [X] T037 [US3] Implement `src/social_support/synthetic/dataset.py`: `write_summary(run_folder,
   packs)` builds a pandas DataFrame with the contract's columns in order (`audit_` columns last)
   and writes `summary.csv` (UTF-8, no index). Call it from `run.generate`, and add the per-outcome
   eligibility counts to `run.json`.
-- [ ] T038 [US3] Wire `--outcome-mix A,D,R` into `src/social_support/synthetic/cli.py` and
+- [X] T038 [US3] Wire `--outcome-mix A,D,R` into `src/social_support/synthetic/cli.py` and
   `run.py`, with the contract's error message and the `Eligibility:` summary line. When no mix is
   given, use natural sampling.
 
@@ -610,3 +610,16 @@ T026 | T027 | T032 | T033 | T034 | T039 | T040
 - **Quickstart step 4:** `--count 100 --seed 7 --inconsistency-rate 30 --inconsistency-types income`
   gave exactly 30 INCOME_MISMATCH packs. Spot check, pack-0005: form 10,693.00 vs bank statement
   17,000.00 (37% under-reported); eligibility SOFT_DECLINE unchanged; routing NEEDS_HUMAN_REVIEW.
+
+### Implementation notes (recorded at the US3 checkpoint, 2026-10-24)
+
+- **Labels never come from targets:** `sample_with_attempts` draws from priors tuned to the target
+  outcome, then keeps only a household that the policy itself labels with that outcome (R4). Over
+  500 targeted profiles the mix 40/40/20 comes out exactly 200/200/100 with fewer than 5 draws per
+  pack on average (unit test).
+- **Run-level generator order:** inconsistency slots are drawn first, then outcome targets, both
+  from `random.Random(seed)`. Runs without a mix or rate never touch it, so earlier outputs and run
+  ids are unchanged.
+- **CLI exit codes:** the temporary "arrives in US2/US3" handler is gone; `SamplingError` now maps
+  to exit 1, as contracts/cli.md specifies for "the profile sampler gives up".
+- **Determinism:** `summary.csv` is now part of the byte-identical check (R5).

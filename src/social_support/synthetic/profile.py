@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-from social_support.domain.models import EmploymentStatus
-from social_support.labelling import HouseholdFacts
+from social_support.domain.models import EmploymentStatus, Outcome
+from social_support.labelling import HouseholdFacts, LabellingPolicy
 from social_support.labelling.facts import money
 from social_support.synthetic.identities import Address, IdentityFactory, emirates_id
 
@@ -146,7 +146,7 @@ def to_facts(profile: HouseholdProfile, as_of: date) -> HouseholdFacts:
 
 @dataclass(frozen=True)
 class Priors:
-    """Ranges the sampler draws from. Feature 002 US3 adds outcome-targeted variants."""
+    """Ranges the sampler draws from: the base priors, or ones tuned to a target outcome."""
 
     status_weights: tuple[int, int, int, int, int] = (50, 12, 18, 8, 12)  # EmploymentStatus order
     salary_range: tuple[int, int] = (2500, 25000)
@@ -159,6 +159,38 @@ class Priors:
 
 
 BASE_PRIORS = Priors()
+
+# Tuned so most draws already earn the target label (research R4). The label still always comes
+# from the policy: these only make rejection sampling cheap.
+TARGET_PRIORS = {
+    Outcome.APPROVE: Priors(
+        status_weights=(45, 8, 25, 10, 12),
+        salary_range=(2500, 7000),
+        stable_job_share=0.95,
+        property_share=0.02,
+        investment_share=0.05,
+        default_share_low_score=0.0,
+        default_share=0.0,
+        score_mean=730,
+    ),
+    Outcome.SOFT_DECLINE: Priors(
+        status_weights=(60, 20, 5, 3, 12),
+        salary_range=(9000, 30000),
+        property_share=0.35,
+        investment_share=0.3,
+        score_mean=700,
+    ),
+    Outcome.NEEDS_HUMAN_REVIEW: Priors(
+        status_weights=(55, 12, 15, 8, 10),
+        salary_range=(3500, 9000),
+        stable_job_share=0.4,
+        property_share=0.03,
+        investment_share=0.05,
+        default_share_low_score=0.6,
+        default_share=0.2,
+        score_mean=580,
+    ),
+}
 
 
 def _amount(rng: random.Random, low: int, high: int, step: int = 50) -> Decimal:
@@ -177,22 +209,58 @@ def sample_profile(
     rng: random.Random,
     as_of: date,
     pack_index: int,
-    priors: Priors = BASE_PRIORS,
     *,
+    target: Outcome | None = None,
+    policy: LabellingPolicy | None = None,
     requires_income: bool = False,
     requires_employment: bool = False,
     max_attempts: int = 200,
 ) -> HouseholdProfile:
-    """Draw one household, redrawing until the constraints hold (research R8: a pack chosen for
-    an income or employment mismatch must have income or a current job)."""
-    for _ in range(max_attempts):
+    """Draw one household, redrawing until every constraint holds.
+
+    - ``requires_income`` / ``requires_employment``: a pack chosen for an income or employment
+      mismatch must have income or a current job (research R8).
+    - ``target``: the policy must label the household with this outcome (research R4).
+    """
+    profile, _ = sample_with_attempts(
+        rng,
+        as_of,
+        pack_index,
+        target=target,
+        policy=policy,
+        requires_income=requires_income,
+        requires_employment=requires_employment,
+        max_attempts=max_attempts,
+    )
+    return profile
+
+
+def sample_with_attempts(
+    rng: random.Random,
+    as_of: date,
+    pack_index: int,
+    *,
+    target: Outcome | None = None,
+    policy: LabellingPolicy | None = None,
+    requires_income: bool = False,
+    requires_employment: bool = False,
+    max_attempts: int = 200,
+) -> tuple[HouseholdProfile, int]:
+    """``sample_profile`` that also returns how many draws it took."""
+    if target is not None and policy is None:
+        raise ValueError("a target outcome needs a policy to label with")
+    priors = TARGET_PRIORS[target] if target is not None else BASE_PRIORS
+    for attempt in range(1, max_attempts + 1):
         profile = _draw_profile(rng, as_of, pack_index, priors)
         if requires_income and profile.net_monthly_income_aed <= 0:
             continue
         if requires_employment and profile.employment_status not in WORKING:
             continue
-        return profile
-    raise SamplingError(f"no profile met the constraints in {max_attempts} attempts")
+        if target is not None and policy.evaluate(to_facts(profile, as_of)).outcome is not target:
+            continue
+        return profile, attempt
+    wanted = f"the outcome {target.value}" if target is not None else "the constraints"
+    raise SamplingError(f"no profile met {wanted} in {max_attempts} attempts")
 
 
 def _draw_profile(

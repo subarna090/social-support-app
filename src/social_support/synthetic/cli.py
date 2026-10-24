@@ -9,6 +9,7 @@ from datetime import date
 from pathlib import Path
 
 from social_support.domain.models import Outcome
+from social_support.synthetic.profile import SamplingError
 from social_support.synthetic.run import (
     INCONSISTENCY_TYPES,
     GenerationRequest,
@@ -90,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     except RequestError as exc:
         print(f"social-support-data: error: {exc}", file=sys.stderr)
         return 2
-    except NotImplementedError as exc:
+    except SamplingError as exc:
         print(f"social-support-data: {exc}", file=sys.stderr)
         return 1
     return 2
