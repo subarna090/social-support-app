@@ -31,3 +31,6 @@ Thumbs.db
 
 # Assessment brief (kept local, not for a public repo)
 *.docx
+
+# Local SQLite database and other runtime data
+data/

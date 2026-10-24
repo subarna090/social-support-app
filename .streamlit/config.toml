@@ -1,0 +1,3 @@
+[browser]
+# No usage telemetry: the UI makes no external network calls (plan constraint).
+gatherUsageStats = false
