@@ -440,7 +440,7 @@ their Emirates IDs.
 
 ### Tests for User Story 4
 
-- [ ] T039 [P] [US4] Write `tests/integration/test_seeding.py` (FR-019, FR-020, research R11) and
+- [X] T039 [P] [US4] Write `tests/integration/test_seeding.py` (FR-019, FR-020, research R11) and
   confirm it fails. The 001 app runs in-process: build `ApiClient(base_url="http://testserver",
   transport=<TestClient from make_client()>._transport)`. Cases:
   - 5 packs: 5 `submitted` rows with reference numbers, `returned_outcome` and
@@ -451,7 +451,7 @@ their Emirates IDs.
     continues.
   - `seed --run` on a folder without `run.json` exits 2 with `not a generated run: <path>`.
   - The console output contains no names, Emirates IDs or incomes.
-- [ ] T040 [P] [US4] Write `tests/e2e/test_generate_seed_lookup.py` (Principle V end-to-end, US4
+- [X] T040 [P] [US4] Write `tests/e2e/test_generate_seed_lookup.py` (Principle V end-to-end, US4
   scenario 2, SC-008):
   - Generate 50 packs with seed 5, then seed them into the in-process 001 app.
   - All 50 are accepted with reference numbers (SC-008).
@@ -460,7 +460,7 @@ their Emirates IDs.
 
 ### Implementation for User Story 4
 
-- [ ] T041 [US4] Implement `src/social_support/synthetic/seeding.py`:
+- [X] T041 [US4] Implement `src/social_support/synthetic/seeding.py`:
   - `seed_run(run_folder, client: ApiClient, limit=None) -> SeedingSummary` posts packs in pack id
     order.
   - On `ApiError` with `status_code == 0` (unreachable), stop and record nothing further.
@@ -469,7 +469,7 @@ their Emirates IDs.
     returned_outcome, eligibility_outcome, matched` (data-model SeedingResult) containing only
     attempted packs.
   - Log only pack ids, reference numbers and counts.
-- [ ] T042 [US4] Add the `seed` subcommand to `src/social_support/synthetic/cli.py`: `--run`,
+- [X] T042 [US4] Add the `seed` subcommand to `src/social_support/synthetic/cli.py`: `--run`,
   `--limit` and `--api-base-url` (default: `ApiClient()`'s own environment, then `.env`, then the
   default resolution). Print the contract messages, and use exit codes 0, 1 and 2.
 
@@ -623,3 +623,24 @@ T026 | T027 | T032 | T033 | T034 | T039 | T040
 - **CLI exit codes:** the temporary "arrives in US2/US3" handler is gone; `SamplingError` now maps
   to exit 1, as contracts/cli.md specifies for "the profile sampler gives up".
 - **Determinism:** `summary.csv` is now part of the byte-identical check (R5).
+- **US3 quickstart step 5 (500 packs, mix 40,40,20):** exactly 200 / 200 / 100 in 1 min 46 s
+  (about 0.2 s per pack). Rules within each outcome: APPROVE `low_income_not_in_work` 108,
+  `low_income_stable_work` 92; SOFT_DECLINE `income_above_band` 137, `high_net_wealth` 63;
+  NEEDS_HUMAN_REVIEW `active_credit_defaults` 57, `poor_credit_score` 28, `borderline_income` 11,
+  `unstable_work_history` 4. Review cases lean heavily on credit problems: feature 005 should
+  decide whether to balance by rule, not just by outcome.
+
+### Implementation notes (recorded at the US4 checkpoint, 2026-10-24)
+
+- **In-process seeding tests:** the generator's `ApiClient` is given the FastAPI `TestClient`'s
+  transport, so tests exercise the real 001 HTTP path (schemas, validation, service, storage)
+  without a server. An `httpx.BaseTransport` wrapper simulates the API dying on the 3rd request.
+- **Live check (quickstart step 7):** a real uvicorn server on a scratch database received 10
+  packs (9 matched the eligibility outcome, 1 differed, as the 001 rule only sees three
+  attributes). A lookup with the pack's Emirates ID returned its record. With the server stopped,
+  `seed` printed the contract message and exited 1, with an empty report. The API log contained no
+  Emirates IDs.
+- **Report per seeding attempt:** `seeding_report.csv` is rewritten by each `seed` command, so it
+  always describes the latest attempt.
+- **Quiet console:** the "application unreachable" log record is at INFO, so Python's last-resort
+  handler no longer prints it next to the contract message.

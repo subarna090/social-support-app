@@ -1,4 +1,4 @@
-"""``social-support-data``: generate synthetic applicant packs (contracts/cli.md).
+"""``social-support-data``: generate synthetic applicant packs and seed the app (contracts/cli.md).
 
 Console output never contains names, Emirates IDs, addresses or incomes.
 """
@@ -16,6 +16,8 @@ from social_support.synthetic.run import (
     RequestError,
     generate,
 )
+from social_support.synthetic.seeding import seed_run
+from social_support.ui.client import UNREACHABLE, ApiClient
 
 
 class _Parser(argparse.ArgumentParser):
@@ -57,6 +59,11 @@ def build_parser() -> argparse.ArgumentParser:
     gen.add_argument("--as-of", type=date.fromisoformat, default=None)
     gen.add_argument("--out", type=Path, default=Path("data/synthetic"))
     gen.add_argument("--overwrite", action="store_true")
+
+    seed = commands.add_parser("seed", help="submit a generated run to the running application")
+    seed.add_argument("--run", type=Path, required=True)
+    seed.add_argument("--limit", type=int, default=None)
+    seed.add_argument("--api-base-url", default=None)
     return parser
 
 
@@ -83,11 +90,33 @@ def _generate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _seed(args: argparse.Namespace) -> int:
+    # Default address: API_BASE_URL from the environment, then .env, then localhost (ApiClient).
+    summary = seed_run(args.run, ApiClient(args.api_base_url), limit=args.limit)
+    if summary.unreachable:
+        print(UNREACHABLE, file=sys.stderr)
+        print(
+            f"Submitted {summary.submitted} of {summary.total} packs before stopping.",
+            file=sys.stderr,
+        )
+        return 1
+    if summary.rejected:
+        print(f"Rejected by the application: {summary.rejected} (see the report)")
+    differed = summary.submitted - summary.matched
+    print(
+        f"Seeded {summary.submitted} packs: {summary.matched} matched the eligibility outcome, "
+        f"{differed} differed. Report: {summary.report_path}"
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     try:
         args = build_parser().parse_args(argv)
         if args.command == "generate":
             return _generate(args)
+        if args.command == "seed":
+            return _seed(args)
     except RequestError as exc:
         print(f"social-support-data: error: {exc}", file=sys.stderr)
         return 2
