@@ -554,3 +554,21 @@ T033 | T034 | T040 | T041
 - The review queue was first wired from the route directly to the repository. It was moved behind
   `ApplicationService`, and T045 gained an extra guard: `api` must not import ORM models.
 - Every guard test was mutation-checked: a violation was planted and the test confirmed to fail.
+
+---
+
+## Phase 7: Convergence
+
+- [X] T050 Log every rejected submission (422) in `src/social_support/api/errors.py` as a structured
+  JSON entry containing only the failing field names (never the submitted values), extending the
+  logging whitelist in `src/social_support/services/tracing.py` if needed, and assert in
+  `tests/integration/test_submit_flow.py` that a rejected payload logs its field names but none of its
+  values per plan: data-model.md invalid-submission logging, Constitution VII (partial)
+- [X] T051 Make the UI honour `API_BASE_URL` from `.env`: in `src/social_support/ui/client.py`, fall back
+  from the environment variable to a value read from a local `.env` file (without importing
+  `social_support.config`, which the architecture guard forbids), remove the unused
+  `Settings.api_base_url` from `src/social_support/config.py`, and cover both sources with a unit test
+  in `tests/ui/` per plan: quickstart.md settings, T004/T006 (partial)
+- [X] T052 Show the net-income definition as visible caption text under the income field in
+  `src/social_support/ui/app.py` (keep the tooltip), and assert it in `tests/ui/test_ui_smoke.py`
+  per FR-001 (partial)

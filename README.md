@@ -35,7 +35,7 @@ Copy-Item .env.example .env      # then set CASEWORKER_PASSCODE in .env
 | `CASEWORKER_PASSCODE` | *(empty)* | Shared passcode for the review queue. When empty, the queue always denies access |
 | `ASSESSOR` | `income_rule` | Which `Assessor` implementation to use |
 | `RULE_THRESHOLD_AED` / `RULE_BAND_UPPER_AED` | `2000` / `2500` | Rule parameters. Changing them creates a new rule version |
-| `API_BASE_URL` | `http://127.0.0.1:8000` | Where the UI finds the API |
+| `API_BASE_URL` | `http://127.0.0.1:8000` | Where the UI finds the API. Read from the environment, then `.env` |
 
 ## Run
 

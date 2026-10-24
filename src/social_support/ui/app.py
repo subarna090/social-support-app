@@ -97,6 +97,7 @@ def render_apply(client: ApiClient) -> None:
             format="%.2f",
             help=INCOME_HELP,
         )
+        st.caption(f"{INCOME_HELP}.")  # FR-001: visible, not only on hover
         _field_error("net_monthly_income_aed")
         st.selectbox(
             "Employment status",

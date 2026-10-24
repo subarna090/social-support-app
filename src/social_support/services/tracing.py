@@ -12,7 +12,16 @@ from datetime import UTC, datetime
 from social_support.domain.models import TraceStatus, TraceStep
 
 LOGGER_NAME = "social_support"
-ALLOWED_EXTRA_KEYS = ("reference_number", "step", "status", "outcome", "rule_version", "error_type")
+ALLOWED_EXTRA_KEYS = (
+    "reference_number",
+    "step",
+    "status",
+    "outcome",
+    "rule_version",
+    "error_type",
+    "path",
+    "fields",  # names of fields that failed validation, never their values
+)
 
 
 class JsonFormatter(logging.Formatter):

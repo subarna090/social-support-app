@@ -1,5 +1,7 @@
 """422 handler producing the flat ``errors[]`` shape from contracts/api.md (FR-003)."""
 
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -11,6 +13,9 @@ from social_support.domain.validation import (
     MSG_FULL_NAME,
     MSG_INCOME,
 )
+from social_support.services.tracing import LOGGER_NAME
+
+logger = logging.getLogger(f"{LOGGER_NAME}.api")
 
 FIELD_MESSAGES = {
     "full_name": MSG_FULL_NAME,
@@ -29,7 +34,7 @@ def _field_name(loc: tuple) -> str:
     return parts[-1] if parts else "body"
 
 
-async def validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     errors: dict[str, str] = {}
     for error in exc.errors():
         name = _field_name(tuple(error.get("loc", ())))
@@ -39,6 +44,12 @@ async def validation_error_handler(_: Request, exc: RequestValidationError) -> J
             errors[name] = MSG_NOT_ACCEPTED
         else:
             errors[name] = FIELD_MESSAGES.get(name, error.get("msg", "Invalid value."))
+    # Invalid submissions have no trace rows, so this log entry is their only record.
+    # Field names only: the submitted values may be identity or income data.
+    logger.info(
+        "request rejected",
+        extra={"status": "rejected", "path": request.url.path, "fields": sorted(errors)},
+    )
     return JSONResponse(
         status_code=422,
         content={"errors": [{"field": f, "message": m} for f, m in errors.items()]},

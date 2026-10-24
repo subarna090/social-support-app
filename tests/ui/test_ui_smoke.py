@@ -91,6 +91,8 @@ def test_apply_tab_renders_all_fields_and_income_help(app):
     assert app.number_input(key="family_size")
     assert app.selectbox(key="employment_status")
     assert "Net (take-home)" in app.number_input(key="net_monthly_income_aed").help
+    # FR-001: the definition is visible on the form, not only in the tooltip (T052)
+    assert any("Net (take-home)" in str(c.value) for c in app.caption)
 
 
 def test_submit_shows_outcome_explanation_and_reference(app):

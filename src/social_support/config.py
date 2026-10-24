@@ -15,7 +15,6 @@ class Settings(BaseSettings):
     assessor: str = "income_rule"
     rule_threshold_aed: Decimal = Decimal("2000")
     rule_band_upper_aed: Decimal = Decimal("2500")
-    api_base_url: str = "http://127.0.0.1:8000"
 
     @model_validator(mode="after")
     def _band_not_below_threshold(self) -> "Settings":

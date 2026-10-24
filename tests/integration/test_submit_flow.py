@@ -128,3 +128,18 @@ def test_95th_percentile_response_time_under_5_seconds(client):  # SC-002
     durations.sort()
     p95 = durations[int(0.95 * (len(durations) - 1))]
     assert p95 < 5.0
+
+
+def test_rejected_submission_logs_field_names_but_no_values(client, caplog):  # data-model.md
+    caplog.set_level(logging.INFO, logger="social_support")
+    payload = valid_payload(full_name="Zubair Secretname", emirates_id="123-45", family_size=0)
+    assert client.post(URL, json=payload).status_code == 422
+
+    records = [r for r in caplog.records if r.name.startswith("social_support")]
+    rejected = [r for r in records if getattr(r, "status", None) == "rejected"]
+    assert len(rejected) == 1
+    entry = json.loads(JsonFormatter().format(rejected[0]))
+    assert entry["fields"] == ["emirates_id", "family_size"]
+    output = "\n".join(JsonFormatter().format(r) for r in records)
+    for secret in ("123-45", "Zubair", "Secretname"):
+        assert secret not in output

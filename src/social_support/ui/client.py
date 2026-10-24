@@ -6,8 +6,19 @@ This module must not import anything else from ``social_support``: the UI only k
 import os
 
 import httpx
+from dotenv import dotenv_values
 
+DEFAULT_API_BASE_URL = "http://127.0.0.1:8000"
 UNREACHABLE = "The assessment service can't be reached. Check that the API is running."
+
+
+def default_base_url() -> str:
+    """API_BASE_URL from the environment, then from a local ``.env``, then the local default."""
+    return (
+        os.environ.get("API_BASE_URL")
+        or dotenv_values(".env").get("API_BASE_URL")
+        or DEFAULT_API_BASE_URL
+    )
 
 
 class ApiError(Exception):
@@ -28,7 +39,7 @@ class ApiClient:
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         self._http = httpx.Client(
-            base_url=base_url or os.environ.get("API_BASE_URL", "http://127.0.0.1:8000"),
+            base_url=base_url or default_base_url(),
             timeout=timeout,
             transport=transport,
         )
