@@ -315,7 +315,7 @@ different from the bank statement, and their answer keys record the true and alt
 
 ### Tests for User Story 2
 
-- [ ] T026 [P] [US2] Write `tests/unit/test_inconsistencies.py` (FR-007–FR-009, FR-011, research R8)
+- [X] T026 [P] [US2] Write `tests/unit/test_inconsistencies.py` (FR-007–FR-009, FR-011, research R8)
   and confirm it fails. It covers:
   - `select_slots` returns exactly `rate × count` slots, rounded half up (5 packs at 50% gives 3;
     100 at 30% gives 30).
@@ -329,7 +329,7 @@ different from the bank statement, and their answer keys record the true and alt
     recomputed; resume current employer.
   - `altered_value != true_value`.
   - Injection leaves `eligibility` unchanged and sets `expected_routing` to `NEEDS_HUMAN_REVIEW`.
-- [ ] T027 [P] [US2] Extend `tests/integration/test_generate_batch.py` (SC-004, US2 acceptance
+- [X] T027 [P] [US2] Extend `tests/integration/test_generate_batch.py` (SC-004, US2 acceptance
   scenarios 1–5):
   - 40 packs at 30% with all types: exactly 12 packs have an inconsistency. For each, the two named
     documents disagree on the named field with exactly the recorded values.
@@ -344,23 +344,23 @@ different from the bank statement, and their answer keys record the true and alt
 
 ### Implementation for User Story 2
 
-- [ ] T028 [US2] Implement `src/social_support/synthetic/inconsistencies.py`:
+- [X] T028 [US2] Implement `src/social_support/synthetic/inconsistencies.py`:
   - The `InconsistencyType` enum (5 types), the `Inconsistency` dataclass (data-model fields
     `type`, `documents`, `field`, `true_value`, `altered_value`), and the `applies(type, profile)`
     rules.
   - `select_slots(rng, count, rate_pct, types)` returns `{index: type}`.
   - `inject(pack_inputs, type, rng)` returns the altered form or document values plus the
     `Inconsistency`, following the table in research R8.
-- [ ] T029 [US2] Add sampler constraints to `src/social_support/synthetic/profile.py`:
+- [X] T029 [US2] Add sampler constraints to `src/social_support/synthetic/profile.py`:
   `sample_profile(..., requires_income=False, requires_employment=False)`, so that slots assigned
   `INCOME_MISMATCH` or `EMPLOYMENT_MISMATCH` always get a profile where the type applies (research
   R8). Extend `tests/unit/test_profile_sampler.py` accordingly.
-- [ ] T030 [US2] Wire injection into `src/social_support/synthetic/pack.py` and
+- [X] T030 [US2] Wire injection into `src/social_support/synthetic/pack.py` and
   `src/social_support/synthetic/run.py`:
   - Renderers receive the altered values for the affected document only.
   - `answer_key.inconsistency` is set, and `expected_routing` is `NEEDS_HUMAN_REVIEW`.
   - `run.json` counts add `expected_routing` and `inconsistencies` per type.
-- [ ] T031 [US2] Wire `--inconsistency-rate` and `--inconsistency-types` (comma list: `income`,
+- [X] T031 [US2] Wire `--inconsistency-rate` and `--inconsistency-types` (comma list: `income`,
   `address`, `family_size`, `identity`, `employment`) into `src/social_support/synthetic/cli.py`,
   with the contract's error messages and the `Inconsistencies:` summary line.
 
@@ -592,3 +592,21 @@ T026 | T027 | T032 | T033 | T034 | T039 | T040
   (exit 1) until those phases wire them in. No test needed a skip marker.
 - **Natural outcome mix:** seed 42 × 10 packs gave APPROVE 4, SOFT_DECLINE 6, NEEDS_HUMAN_REVIEW 0.
   The base priors lean towards higher incomes; US3's outcome-targeted sampling controls the mix.
+
+### Implementation notes (recorded at the US2 checkpoint, 2026-10-24)
+
+- **Run-level generator:** slot selection uses `random.Random(seed)`, separate from the per-pack
+  generators, so packs stay independent (R5). With a 0% rate the master generator is never used,
+  so US1 output and run ids are unchanged.
+- **Constraints by redrawing:** `sample_profile(..., requires_income, requires_employment)` redraws
+  from the same pack generator until the constraint holds (cap 200, then `SamplingError`). A pack's
+  content is still determined by its seed and slot.
+- **Exact differences:** `pack_checks.expected_differences` states, per type, the exact set of
+  (field, document) pairs that must differ. Tests assert equality, which catches both missing and
+  unlisted differences (SC-004).
+- **Test size deviation:** T027 asked for "100 packs restricted to `address`". The test uses 20 packs
+  at 50% (10 injected): the property is the same, and rendering 100 packs would add about a minute
+  to the default suite. The 200-pack check is in the slow suite.
+- **Quickstart step 4:** `--count 100 --seed 7 --inconsistency-rate 30 --inconsistency-types income`
+  gave exactly 30 INCOME_MISMATCH packs. Spot check, pack-0005: form 10,693.00 vs bank statement
+  17,000.00 (37% under-reported); eligibility SOFT_DECLINE unchanged; routing NEEDS_HUMAN_REVIEW.

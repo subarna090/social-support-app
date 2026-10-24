@@ -169,8 +169,34 @@ def _months_ago(as_of: date, months: int) -> date:
     return _month_start(_month_index(as_of) - months)
 
 
+class SamplingError(RuntimeError):
+    """The sampler could not meet its constraints within the attempt limit."""
+
+
 def sample_profile(
-    rng: random.Random, as_of: date, pack_index: int, priors: Priors = BASE_PRIORS
+    rng: random.Random,
+    as_of: date,
+    pack_index: int,
+    priors: Priors = BASE_PRIORS,
+    *,
+    requires_income: bool = False,
+    requires_employment: bool = False,
+    max_attempts: int = 200,
+) -> HouseholdProfile:
+    """Draw one household, redrawing until the constraints hold (research R8: a pack chosen for
+    an income or employment mismatch must have income or a current job)."""
+    for _ in range(max_attempts):
+        profile = _draw_profile(rng, as_of, pack_index, priors)
+        if requires_income and profile.net_monthly_income_aed <= 0:
+            continue
+        if requires_employment and profile.employment_status not in WORKING:
+            continue
+        return profile
+    raise SamplingError(f"no profile met the constraints in {max_attempts} attempts")
+
+
+def _draw_profile(
+    rng: random.Random, as_of: date, pack_index: int, priors: Priors
 ) -> HouseholdProfile:
     """Draw one household. Every random choice comes from ``rng``, in a fixed order."""
     ids = IdentityFactory(rng)

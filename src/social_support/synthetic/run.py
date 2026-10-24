@@ -7,6 +7,7 @@ that is renamed into place at the end, so an interrupted run never leaves a half
 import hashlib
 import json
 import logging
+import random
 import shutil
 import time
 from collections import Counter
@@ -18,6 +19,7 @@ from social_support.domain.models import Outcome
 from social_support.labelling import LabellingPolicy, load_policy
 from social_support.services.tracing import LOGGER_NAME
 from social_support.synthetic import GENERATOR_VERSION
+from social_support.synthetic.inconsistencies import InconsistencyType, inject, select_slots
 from social_support.synthetic.pack import FORMAT, build_pack, write_pack
 from social_support.synthetic.profile import pack_rng, sample_profile
 
@@ -104,8 +106,8 @@ def check(request: GenerationRequest) -> None:
         raise RequestError(
             f"output already exists: {request.folder} (use --overwrite to replace it)"
         )
-    if request.inconsistency_rate_pct or request.outcome_mix_pct:
-        raise NotImplementedError("inconsistencies and outcome mixes arrive in US2 and US3")
+    if request.outcome_mix_pct:
+        raise NotImplementedError("outcome mixes arrive in US3")
 
 
 def _rename_with_retry(source: Path, target: Path, attempts: int = 20) -> None:
@@ -128,13 +130,33 @@ def generate(request: GenerationRequest, policy: LabellingPolicy | None = None) 
     temp = final.with_name(f".{run_id}.partial")
     if temp.exists():
         shutil.rmtree(temp)
+    # Run-level decisions use their own generator, so packs stay independent of each other (R5).
+    master = random.Random(request.seed)
+    slots = (
+        select_slots(
+            master, request.count, request.inconsistency_rate_pct, request.inconsistency_types
+        )
+        if request.inconsistency_rate_pct
+        else {}
+    )
     try:
         eligibility: Counter[str] = Counter()
         routing: Counter[str] = Counter()
+        injected: Counter[str] = Counter()
         for index in range(1, request.count + 1):
             rng = pack_rng(request.seed, index)
-            profile = sample_profile(rng, request.as_of, pack_index=index)
+            kind = slots.get(index)
+            profile = sample_profile(
+                rng,
+                request.as_of,
+                pack_index=index,
+                requires_income=kind is InconsistencyType.INCOME_MISMATCH,
+                requires_employment=kind is InconsistencyType.EMPLOYMENT_MISMATCH,
+            )
             pack = build_pack(index, profile, policy, request.as_of, rng)
+            if kind:
+                inject(pack, kind, rng)
+                injected[kind.value] += 1
             write_pack(pack, temp / "packs" / pack.pack_id, run_id, request.as_of, rng)
             eligibility[pack.label.outcome.value] += 1
             routing[pack.expected_routing.value] += 1
@@ -144,7 +166,9 @@ def generate(request: GenerationRequest, policy: LabellingPolicy | None = None) 
             "packs": request.count,
             "eligibility": {o.value: eligibility[o.value] for o in Outcome},
             "expected_routing": {o.value: routing[o.value] for o in Outcome},
-            "inconsistencies": {},
+            "inconsistencies": {
+                t.value: injected[t.value] for t in InconsistencyType if injected[t.value]
+            },
         }
         record = {
             "format": FORMAT,

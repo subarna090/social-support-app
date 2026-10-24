@@ -86,3 +86,20 @@ def test_spec_edge_cases_are_reachable(profiles):
         p.income_sources and all(s.kind != "SALARY" for s in p.income_sources) for p in profiles
     )
     assert {p.employment_status for p in profiles} == set(EmploymentStatus)
+
+
+def test_constraints_force_income_and_employment():  # T029
+    for index in range(1, 60):
+        p = sample_profile(
+            pack_rng(8, index),
+            AS_OF,
+            pack_index=index,
+            requires_income=True,
+            requires_employment=True,
+        )
+        assert to_facts(p, AS_OF).net_monthly_income_aed > 0
+        assert p.employment_status in WORKING
+
+
+def test_unconstrained_sampling_is_unchanged_by_the_constraint_option():
+    assert sample(42, 7) == sample_profile(pack_rng(42, 7), AS_OF, pack_index=7)

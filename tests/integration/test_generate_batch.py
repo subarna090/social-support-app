@@ -150,3 +150,55 @@ def test_logs_carry_ids_but_no_personal_data(tmp_path, caplog):  # U3, Principle
         form, _ = pack_checks.load(pack)
         for secret in (form["full_name"], form["emirates_id"], form["net_monthly_income_aed"]):
             assert secret not in output
+
+
+# --- US2: injected inconsistencies (T027) ------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def mixed_run(tmp_path_factory):
+    request = GenerationRequest(
+        count=40, seed=77, inconsistency_rate_pct=30, output_root=tmp_path_factory.mktemp("m")
+    )
+    return generate(request)
+
+
+def test_exact_number_of_packs_get_an_inconsistency(mixed_run):  # US2 scenario 1
+    keys = [pack_checks.load(p)[1] for p in sorted((mixed_run.folder / "packs").iterdir())]
+    affected = [k for k in keys if k["inconsistency"]]
+    assert len(affected) == 12
+    assert sum(mixed_run.counts["inconsistencies"].values()) == 12
+
+
+def test_inconsistencies_are_recorded_exactly_and_nothing_else_differs(mixed_run):  # SC-004
+    for pack in sorted((mixed_run.folder / "packs").iterdir()):
+        form, key = pack_checks.load(pack)
+        record = key["inconsistency"]
+        assert pack_checks.differences(key, form) == pack_checks.expected_differences(record)
+        assert pack_checks.shown_values_appear(pack, key) == [], pack.name
+        if record:
+            assert pack_checks.recorded_values_match(key, form), pack.name
+            assert key["expected_routing"] == "NEEDS_HUMAN_REVIEW"  # US2 scenario 5
+        else:
+            assert key["expected_routing"] == key["eligibility"]["outcome"]
+
+
+def test_altered_forms_are_still_valid_submissions(mixed_run):  # FR-002, C4
+    for pack in sorted((mixed_run.folder / "packs").iterdir()):
+        form, _ = pack_checks.load(pack)
+        SubmitApplicationRequest.model_validate(form["submission"])
+
+
+def test_restricting_types_injects_only_those(tmp_path):  # US2 scenario 2
+    request = GenerationRequest(
+        count=20,
+        seed=5,
+        inconsistency_rate_pct=50,
+        inconsistency_types=("ADDRESS_MISMATCH",),
+        output_root=tmp_path,
+    )
+    run = generate(request)
+    assert run.counts["inconsistencies"] == {"ADDRESS_MISMATCH": 10}
+    for pack in sorted((run.folder / "packs").iterdir()):
+        _, key = pack_checks.load(pack)
+        assert key["inconsistency"] is None or key["inconsistency"]["type"] == "ADDRESS_MISMATCH"

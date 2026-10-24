@@ -182,3 +182,34 @@ def differences(key: dict, form: dict) -> set[tuple[str, str]]:
         },
     )
     return found
+
+
+def expected_differences(inconsistency: dict | None) -> set[tuple[str, str]]:
+    """The exact (field, document) differences an injected inconsistency must cause (R8)."""
+    if inconsistency is None:
+        return set()
+    kind, field = inconsistency["type"], inconsistency["field"]
+    return {
+        "INCOME_MISMATCH": {("net_monthly_income_aed", "form")},
+        "ADDRESS_MISMATCH": {("address", "credit_report")},
+        "FAMILY_SIZE_MISMATCH": {
+            ("family_members", "form"),
+            ("family_size", "form"),
+            ("family_size", "form_members"),
+        },
+        "IDENTITY_MISMATCH": {(field, "emirates_id")},
+        "EMPLOYMENT_MISMATCH": {("employer", "resume")},
+    }[kind]
+
+
+def recorded_values_match(key: dict, form: dict) -> bool:
+    """The answer key's true/altered values are the ones actually shown."""
+    record, docs = key["inconsistency"], key["documents"]
+    shown = {
+        "INCOME_MISMATCH": lambda: form["net_monthly_income_aed"],
+        "ADDRESS_MISMATCH": lambda: docs["credit_report"]["address"],
+        "FAMILY_SIZE_MISMATCH": lambda: str(form["family_size"]),
+        "IDENTITY_MISMATCH": lambda: docs["emirates_id"][record["field"]],
+        "EMPLOYMENT_MISMATCH": lambda: docs["resume"]["current_employer"],
+    }[record["type"]]()
+    return shown == record["altered_value"]
