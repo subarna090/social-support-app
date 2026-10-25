@@ -61,7 +61,7 @@ This project is built with GitHub Spec Kit (`specify` CLI 1.2.0, PowerShell scri
 ## Local environment constraints
 
 - Windows, CPU only (no GPU), 15 GB RAM. No Docker, no local Postgres.
-- Ollama models: `qwen2.5:7b` (main), `qwen2.5:3b` (fast fallback), `nomic-embed-text` (embeddings). Prefer OCR (Tesseract/EasyOCR) over vision LLMs for ID images.
+- Ollama models: `qwen2.5:7b` (main), `qwen2.5:3b` (fast fallback), `nomic-embed-text` (embeddings). For ID images use RapidOCR (pip-only ONNX OCR, CPU, ~2–3 s per card, ~300 MB RAM), not vision LLMs. Tesseract cannot be installed here; EasyOCR (PyTorch) is too heavy.
 - Use SQLite through SQLAlchemy for now so that Postgres is a config swap later. ChromaDB runs embedded.
 - Python is managed with `uv`.
 

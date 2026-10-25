@@ -35,7 +35,7 @@ purpose so later features have something to detect.
 
 ### 003 Document extraction
 
-Turn uploaded attachments into structured fields: OCR (Tesseract/EasyOCR) for the Emirates ID
+Turn uploaded attachments into structured fields: OCR with RapidOCR (pip-only, CPU) for the Emirates ID
 image, parsing for PDFs and the Excel file, and a local LLM (`qwen2.5`) for less structured text
 such as resumes. Store raw documents and extracted fields together (multimodal storage), and
 measure accuracy against the 002 answer keys. Failed extraction routes to human review.
