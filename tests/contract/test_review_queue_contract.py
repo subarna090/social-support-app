@@ -35,6 +35,12 @@ def test_200_items_have_exactly_the_documented_fields(client):
     assert response.status_code == 200
     items = response.json()["items"]
     assert len(items) == 1
-    assert set(items[0]) == {"reference_number", "full_name", "submitted_at", "flag_reason"}
+    assert set(items[0]) == {
+        "reference_number",
+        "full_name",
+        "submitted_at",
+        "flag_reason",
+        "reasons",
+    }
     assert items[0]["flag_reason"] == "borderline income"
     assert items[0]["submitted_at"].endswith("Z")

@@ -1,0 +1,101 @@
+# Decision policy v1 (feature 004, research R5).
+#
+# Unlike eligibility_v1, EVERY rule is checked on its own (LabellingPolicy.evaluate_all), so each
+# rule states all of its bounds. Each matching rule is one finding shown to the applicant. The
+# decision is the most severe finding: NEEDS_HUMAN_REVIEW > SOFT_DECLINE > APPROVE.
+# Failed cross-checks and unreadable documents are added as review findings by the service.
+#
+# Every reason states the value and its threshold (FR-009).
+# Any edit to this file, including comments, produces a new policy version id.
+
+name = "decision"
+version = "v1"
+description = "Document-based decision findings for the PoC demo (feature 004)."
+
+# --- positive findings (APPROVE) ---------------------------------------------------------------
+
+[[rules]]
+id = "income_within_band"
+outcome = "APPROVE"
+reason = "Income per member of {income_per_member_aed} AED is below the 2000.00 AED support band."
+conditions = [{ factor = "income_per_member_aed", op = "lt", value = 2000 }]
+
+[[rules]]
+id = "wealth_within_limit"
+outcome = "APPROVE"
+reason = "Net wealth of {net_wealth_aed} AED is within the 500000.00 AED limit."
+conditions = [{ factor = "net_wealth_aed", op = "le", value = 500000 }]
+
+[[rules]]
+id = "credit_good_standing"
+outcome = "APPROVE"
+reason = "Credit score of {credit_score} is at least 550, with {active_credit_defaults} active defaults."
+conditions = [
+    { factor = "credit_score", op = "ge", value = 550 },
+    { factor = "active_credit_defaults", op = "eq", value = 0 },
+]
+
+[[rules]]
+id = "stable_work"
+outcome = "APPROVE"
+reason = "Worked {months_employed_last_24} of the last 24 months (at least 12 needed for a stable history)."
+conditions = [{ factor = "months_employed_last_24", op = "ge", value = 12 }]
+
+[[rules]]
+id = "not_in_work"
+outcome = "APPROVE"
+reason = "The applicant is {employment_status}, so no recent work history is required."
+conditions = [{ factor = "employment_status", op = "in", value = ["UNEMPLOYED", "STUDENT", "RETIRED"] }]
+
+# --- outside the criteria (SOFT_DECLINE) -------------------------------------------------------
+
+[[rules]]
+id = "income_above_band"
+outcome = "SOFT_DECLINE"
+reason = "Income per member of {income_per_member_aed} AED is above the 2500.00 AED support band."
+conditions = [{ factor = "income_per_member_aed", op = "gt", value = 2500 }]
+
+[[rules]]
+id = "high_net_wealth"
+outcome = "SOFT_DECLINE"
+reason = "Net wealth of {net_wealth_aed} AED is above the 500000.00 AED limit."
+conditions = [{ factor = "net_wealth_aed", op = "gt", value = 500000 }]
+
+# --- uncertain, a caseworker decides (NEEDS_HUMAN_REVIEW) --------------------------------------
+
+[[rules]]
+id = "borderline_income"
+outcome = "NEEDS_HUMAN_REVIEW"
+reason = "Income per member of {income_per_member_aed} AED is in the 2000.00-2500.00 AED borderline band."
+conditions = [
+    { factor = "income_per_member_aed", op = "ge", value = 2000 },
+    { factor = "income_per_member_aed", op = "le", value = 2500 },
+]
+
+[[rules]]
+id = "active_credit_defaults"
+outcome = "NEEDS_HUMAN_REVIEW"
+reason = "The credit report shows {active_credit_defaults} active default(s); any default needs a caseworker."
+conditions = [{ factor = "active_credit_defaults", op = "ge", value = 1 }]
+
+[[rules]]
+id = "poor_credit_score"
+outcome = "NEEDS_HUMAN_REVIEW"
+reason = "Credit score of {credit_score} is below 550."
+conditions = [{ factor = "credit_score", op = "lt", value = 550 }]
+
+[[rules]]
+id = "unstable_work_history"
+outcome = "NEEDS_HUMAN_REVIEW"
+reason = "The applicant is {employment_status} but worked only {months_employed_last_24} of the last 24 months (12 needed)."
+conditions = [
+    { factor = "months_employed_last_24", op = "lt", value = 12 },
+    { factor = "employment_status", op = "in", value = ["EMPLOYED", "SELF_EMPLOYED"] },
+]
+
+# Required by the policy format; evaluate_all never reports it.
+[[rules]]
+id = "default"
+outcome = "APPROVE"
+reason = "No rule applied."
+conditions = []

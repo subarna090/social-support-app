@@ -26,6 +26,13 @@ FIELD_MESSAGES = {
     + ", ".join(s.label for s in EmploymentStatus)
     + ".",
 }
+FIELD_MESSAGES |= {  # feature 004: the five mandatory documents (FR-002)
+    "bank_statement": "Attach the bank statement.",
+    "emirates_id_card": "Attach the Emirates ID card image.",
+    "resume": "Attach the resume.",
+    "assets_liabilities": "Attach the assets and liabilities spreadsheet.",
+    "credit_report": "Attach the credit report.",
+}
 MSG_NOT_ACCEPTED = "This field is not accepted."
 
 

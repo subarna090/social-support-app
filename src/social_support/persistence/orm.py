@@ -70,3 +70,73 @@ class ProcessingTraceStepRow(Base):
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     application: Mapped[ApplicationRow] = relationship(back_populates="trace_steps")
+
+
+# --- feature 004: documents, cross-checks, decision inputs and findings, enablement ------------
+
+
+class DocumentRow(Base):
+    __tablename__ = "application_documents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    application_id: Mapped[int] = mapped_column(ForeignKey("applications.id"), index=True)
+    document_type: Mapped[str] = mapped_column(String(32))
+    original_filename: Mapped[str] = mapped_column(String(255))
+    stored_path: Mapped[str] = mapped_column(String(500))
+    sha256: Mapped[str] = mapped_column(String(64))
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    ok: Mapped[bool] = mapped_column(Boolean)
+    error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    fields: Mapped[dict] = mapped_column(JSON)
+    items: Mapped[dict] = mapped_column(JSON)
+    confidence: Mapped[dict] = mapped_column(JSON)
+    duration_ms: Mapped[int] = mapped_column(Integer)
+
+
+class CrossCheckRow(Base):
+    __tablename__ = "cross_check_results"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    application_id: Mapped[int] = mapped_column(ForeignKey("applications.id"), index=True)
+    check_id: Mapped[str] = mapped_column(String(64))
+    passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    form_value: Mapped[str] = mapped_column(String(200))
+    document_value: Mapped[str] = mapped_column(String(200))
+    message: Mapped[str] = mapped_column(Text)
+
+
+class DecisionInputsRow(Base):
+    __tablename__ = "decision_inputs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    decision_id: Mapped[int] = mapped_column(ForeignKey("decisions.id"), unique=True)
+    facts: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # None: rules were skipped
+    fact_sources: Mapped[dict] = mapped_column(JSON)
+
+
+class FindingRow(Base):
+    __tablename__ = "decision_findings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    decision_id: Mapped[int] = mapped_column(ForeignKey("decisions.id"), index=True)
+    sequence: Mapped[int] = mapped_column(Integer)
+    rule_id: Mapped[str] = mapped_column(String(64))
+    outcome: Mapped[str] = mapped_column(String(32))
+    text: Mapped[str] = mapped_column(Text)
+    sources: Mapped[list] = mapped_column(JSON)
+
+
+class EnablementPlanRow(Base):
+    __tablename__ = "enablement_plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    application_id: Mapped[int] = mapped_column(ForeignKey("applications.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    model: Mapped[str] = mapped_column(String(64))
+    is_fallback: Mapped[bool] = mapped_column(Boolean)
+    profile: Mapped[dict] = mapped_column(JSON)  # exactly what was sent to the model
+    latency_ms: Mapped[int] = mapped_column(Integer)
+    error_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    training: Mapped[list] = mapped_column(JSON)
+    job_matches: Mapped[list] = mapped_column(JSON)
+    career_counselling: Mapped[str] = mapped_column(Text)

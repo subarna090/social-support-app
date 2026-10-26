@@ -76,16 +76,30 @@ class LabellingPolicy:
     def evaluate(self, facts: HouseholdFacts) -> LabelResult:
         for rule in self.rules:
             if all(condition.holds(facts) for condition in rule.conditions):
-                factors = [c.factor for c in rule.conditions] or list(rule.reason_factors)
-                values = {name: getattr(facts, name) for name in rule.reason_factors}
-                return LabelResult(
-                    outcome=rule.outcome,
-                    rule_id=rule.id,
-                    compared={name: getattr(facts, name) for name in dict.fromkeys(factors)},
-                    reason=rule.reason.format(**{k: _text(v) for k, v in values.items()}),
-                    policy_version_id=self.version_id,
-                )
+                return self._result(rule, facts)
         raise PolicyError("no rule matched")  # unreachable: the last rule always matches
+
+    def evaluate_all(self, facts: HouseholdFacts) -> list[LabelResult]:
+        """Every non-default rule whose conditions hold, in file order (feature 004, R5).
+
+        Unlike ``evaluate``, each rule is judged on its own, so rules must state all their bounds.
+        """
+        return [
+            self._result(rule, facts)
+            for rule in self.rules
+            if rule.conditions and all(condition.holds(facts) for condition in rule.conditions)
+        ]
+
+    def _result(self, rule: Rule, facts: HouseholdFacts) -> LabelResult:
+        factors = [c.factor for c in rule.conditions] or list(rule.reason_factors)
+        values = {name: getattr(facts, name) for name in rule.reason_factors}
+        return LabelResult(
+            outcome=rule.outcome,
+            rule_id=rule.id,
+            compared={name: getattr(facts, name) for name in dict.fromkeys(factors)},
+            reason=rule.reason.format(**{k: _text(v) for k, v in values.items()}),
+            policy_version_id=self.version_id,
+        )
 
 
 def _text(value: object) -> str:

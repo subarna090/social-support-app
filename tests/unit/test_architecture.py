@@ -124,3 +124,56 @@ def test_labelling_facts_exclude_identity_and_protected_attributes():
     }
     protected = {"nationality", "gender", "religion", "ethnicity", "marital_status"}
     assert not names & (protected | {"full_name", "emirates_id"})
+
+
+# --- feature 004: extraction, enablement and the identity boundary (plan.md) ------------------
+
+OUTER = tuple(
+    f"social_support.{p}"
+    for p in ("persistence", "services", "api", "ui", "synthetic", "assessment", "config")
+)
+
+
+@pytest.mark.parametrize("package", ["extraction", "enablement"])
+def test_adapters_depend_only_on_domain(package):
+    assert _violations(package, OUTER + ("sqlalchemy", "fastapi", "streamlit")) == []
+
+
+def test_domain_stays_free_of_adapters():
+    assert _violations("domain", ("httpx", "rapidocr_onnxruntime", "pypdf", "openpyxl")) == []
+    assert _violations("domain", ("social_support.extraction", "social_support.enablement")) == []
+
+
+def test_document_assessor_never_receives_documents_or_identity():
+    import inspect
+    import typing
+
+    from social_support.assessment.document_rules import DocumentRuleAssessor
+
+    hints = typing.get_type_hints(DocumentRuleAssessor.assess_case)
+    text = " ".join(str(h) for h in hints.values())
+    for forbidden in ("ExtractedDocument", "CrossCheckResult", "Submission"):
+        assert forbidden not in text
+    assert set(inspect.signature(DocumentRuleAssessor.assess_case).parameters) == {
+        "self",
+        "facts",
+        "findings",
+    }
+    imported = {
+        alias.name
+        for node in ast.walk(
+            ast.parse((SRC / "assessment" / "document_rules.py").read_text(encoding="utf-8"))
+        )
+        if isinstance(node, ast.ImportFrom) and node.module == "social_support.domain.documents"
+        for alias in node.names
+    }
+    assert imported <= {"FORM_LABEL", "CaseAssessment", "Finding"}
+
+
+def test_enablement_profile_has_no_identity_or_exact_income():
+    from social_support.domain.enablement import EnablementProfile
+
+    names = {f.name for f in dataclasses.fields(EnablementProfile)}
+    forbidden = {"full_name", "emirates_id", "employer", "net_monthly_income_aed", "address"}
+    protected = {"nationality", "gender", "religion", "ethnicity", "marital_status"}
+    assert not names & (forbidden | protected)

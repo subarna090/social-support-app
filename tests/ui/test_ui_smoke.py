@@ -28,6 +28,54 @@ APPROVED = {
 }
 
 
+PLAN = {
+    "training": ["Retail management certificate"],
+    "job_matches": ["Store supervisor"],
+    "career_counselling": "Build on your customer service experience.",
+    "is_fallback": False,
+    "model": "qwen2.5:7b",
+    "created_at": "2026-10-23T10:15:30Z",
+}
+FINDINGS_RESULT = APPROVED | {
+    "decision": APPROVED["decision"]
+    | {
+        "findings": [
+            {
+                "rule_id": "income_within_band",
+                "outcome": "APPROVE",
+                "text": "Income per member of 1200.00 AED is below the 2000.00 AED support band.",
+                "sources": ["Bank statement", "Application form"],
+            },
+            {
+                "rule_id": "crosscheck:income_vs_bank",
+                "outcome": "NEEDS_HUMAN_REVIEW",
+                "text": "Declared income differs from the bank statement.",
+                "sources": ["Application form", "Bank statement"],
+            },
+        ]
+    },
+    "documents": [
+        {
+            "document_type": "BANK_STATEMENT",
+            "label": "Bank statement",
+            "ok": True,
+            "error": None,
+            "fields": {"monthly_income_aed": "9000.00"},
+            "items": {},
+        }
+    ],
+    "cross_checks": [
+        {
+            "check_id": "income_vs_bank",
+            "passed": False,
+            "form_value": "7000.00",
+            "document_value": "9000.00",
+            "message": "Declared income differs.",
+        }
+    ],
+}
+
+
 APPLICATION = {
     "full_name": "Aisha Al Mansoori",
     "emirates_id": "784-1990-1234567-1",
@@ -42,6 +90,7 @@ class FakeClient:
     submitted: list[dict] = []
 
     lookup_response: dict | ApiError = APPROVED
+    enablement_response: dict | ApiError = PLAN
     review_response: dict | ApiError = {"items": []}
 
     def review_queue(self, passcode: str) -> dict:
@@ -54,11 +103,16 @@ class FakeClient:
             raise self.lookup_response
         return self.lookup_response
 
-    def submit(self, payload: dict) -> dict:
+    def submit_with_documents(self, payload: dict, files: dict) -> dict:
         FakeClient.submitted.append(payload)
         if isinstance(self.response, ApiError):
             raise self.response
         return self.response
+
+    def enablement(self, reference_number: str, emirates_id: str) -> dict:
+        if isinstance(self.enablement_response, ApiError):
+            raise self.enablement_response
+        return self.enablement_response
 
 
 @pytest.fixture
@@ -67,6 +121,7 @@ def app(monkeypatch) -> AppTest:
     FakeClient.response, FakeClient.submitted = APPROVED, []
     FakeClient.lookup_response = APPROVED | {"application": APPLICATION}
     FakeClient.review_response = {"items": []}
+    FakeClient.enablement_response = PLAN
     monkeypatch.setattr(client_module, "ApiClient", FakeClient)
     return AppTest.from_file(str(APP), default_timeout=30).run()
 
@@ -103,6 +158,39 @@ def test_submit_shows_outcome_explanation_and_reference(app):
     text = _texts(app)
     for fragment in ("Approve", "1500.00 AED per member", "SSA-7K2M9QXH4D"):
         assert fragment in text
+
+
+def test_document_result_shows_findings_checks_documents_and_plan(app):
+    FakeClient.response = FINDINGS_RESULT
+    _fill(app)
+    app.button[0].click().run()
+    assert not app.exception
+    text = _texts(app)
+    for fragment in (
+        "below the 2000.00 AED support band",
+        "Source: Bank statement, Application form",
+        "Retail management certificate",
+        "Store supervisor",
+        "qwen2.5:7b",
+    ):
+        assert fragment in text
+    checks = app.table[0].value
+    assert list(checks["Result"]) == ["❌ Failed"]
+
+
+def test_enablement_fallback_and_failure_are_labelled(app):
+    FakeClient.enablement_response = PLAN | {"is_fallback": True, "model": "fallback"}
+    _fill(app)
+    app.button[0].click().run()
+    assert "General guidance" in _texts(app)
+
+
+def test_missing_document_error_is_shown_under_its_uploader(app):
+    FakeClient.response = ApiError(422, "Validation failed", {"resume": "Attach the resume."})
+    _fill(app)
+    app.button[0].click().run()
+    assert not app.exception
+    assert "Attach the resume." in _texts(app)
 
 
 def test_validation_errors_are_shown_per_field(app):

@@ -18,6 +18,10 @@
   downloads models on first run). OCR sometimes drops spaces in captions (`ExpiryDate`), so the
   parser matches captions with spaces removed, finds the value as the next line, and matches the ID
   number with the regex `784-\d{4}-\d{7}-\d`.
+- **Upscaling** (found during implementation): at the card's native 1012 px width, RapidOCR dropped
+  the spaces in two of the three demo names ("OmarKhalidAl Mansoori"). Doubling the image first gives
+  correctly spaced names on all three cards, at about the same speed (2.5–3.8 s). As a second safety
+  net, the name cross-checks ignore whitespace entirely.
 - **Confidence routing** (Principle III): each extracted ID card field keeps the line's OCR score. If
   a required field (name, ID number, date of birth) scores below `OCR_MIN_CONFIDENCE` (default 0.80;
   the test card scored 0.96–1.0), the card is `ok=False` with the error "read with low confidence",
@@ -88,6 +92,10 @@
   repeat call returns the stored plan instead of calling the model again.
 - **Alternatives**: the `ollama` Python package (an extra dependency for one call); streaming
   (unnecessary for the demo).
+- **Measured** (2026-10-26, this laptop, review demo profile): `qwen2.5:7b` answered in 42 s cold
+  (model load included) and 18.5 s warm, with valid JSON both times and recommendations built on
+  the resume's skills. That is within the 90 s timeout, so `qwen2.5:7b` stays the default; submitting
+  one application before presenting warms the model.
 
 ## R8 Demo packs
 

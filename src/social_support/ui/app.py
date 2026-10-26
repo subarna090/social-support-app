@@ -16,10 +16,31 @@ OUTCOMES = {  # label, badge colour
     "NEEDS_HUMAN_REVIEW": ("Needs Human Review", "orange"),
     "SOFT_DECLINE": ("Soft Decline", "gray"),
 }
+OUTCOME_HEADLINES = {
+    "APPROVE": "Your application meets the criteria for financial support.",
+    "SOFT_DECLINE": "Your application does not meet the criteria at this time.",
+    "NEEDS_HUMAN_REVIEW": "A caseworker will review your application.",
+}
+FINDING_ICONS = {"APPROVE": "✅", "SOFT_DECLINE": "❌", "NEEDS_HUMAN_REVIEW": "⚠️"}
 INCOME_HELP = (
     "Net (take-home) monthly income from all sources (salary, business, rental, pensions, "
     "existing benefits) for all household members"
 )
+# Feature 004: the five mandatory documents, as (upload field, label, accepted types).
+DOCUMENTS = (
+    ("bank_statement", "Bank statement (PDF)", ["pdf"]),
+    ("emirates_id_card", "Emirates ID card (image)", ["png", "jpg", "jpeg"]),
+    ("resume", "Resume (PDF)", ["pdf"]),
+    ("assets_liabilities", "Assets and liabilities (Excel)", ["xlsx"]),
+    ("credit_report", "Credit report (PDF)", ["pdf"]),
+)
+CHECK_LABELS = {
+    "name_vs_id_card": "Name matches the Emirates ID card",
+    "emirates_id_vs_id_card": "Emirates ID number matches the card",
+    "name_vs_bank_holder": "Name matches the bank account holder",
+    "income_vs_bank": "Declared income matches the bank statement",
+}
+CHECK_MARKS = {True: "✅ Passed", False: "❌ Failed", None: "– Not checked"}
 
 
 @st.cache_resource
@@ -28,7 +49,6 @@ def get_client() -> ApiClient:
 
 
 def _submit_application() -> None:
-    """Form callback: runs before the rerun, so results render on the same screen."""
     state = st.session_state
     payload = {
         "full_name": state.full_name,
@@ -37,14 +57,27 @@ def _submit_application() -> None:
         "net_monthly_income_aed": f"{state.net_monthly_income_aed:.2f}",
         "employment_status": state.employment_status,
     }
+    # Missing documents are left out: the API names each one (FR-002).
+    files = {}
+    for field, _label, _types in DOCUMENTS:
+        upload = state.get(f"upload_{field}")
+        if upload is not None:
+            files[field] = (upload.name, upload.getvalue(), upload.type)
     state.apply_result, state.apply_errors, state.apply_failure = None, {}, None
+    state.enablement, state.enablement_failure = None, None
     try:
-        state.apply_result = get_client().submit(payload)
+        state.apply_result = get_client().submit_with_documents(payload, files)
+        state.apply_emirates_id = state.emirates_id
     except ApiError as exc:
         if exc.field_errors:
             state.apply_errors = exc.field_errors
         else:
             state.apply_failure = exc.detail
+
+
+def _request_submit() -> None:
+    """Form callback: the slow submission runs in the script body, under a spinner."""
+    st.session_state.submit_pending = True
 
 
 def _field_error(field: str) -> None:
@@ -62,12 +95,26 @@ def _lookup_application() -> None:
         state.lookup_failure = exc.detail
 
 
+def _show_findings(findings: list[dict]) -> None:
+    st.markdown("**Why**")
+    for finding in findings:
+        icon = FINDING_ICONS[finding["outcome"]]
+        source = ", ".join(finding["sources"])
+        line = f"{icon} {finding['text']}"
+        st.markdown(f"{line}  \n:gray[Source: {source}]" if source else line)
+
+
 def _show_decision(result: dict, *, show_reference_hint: bool = True) -> None:
     decision = result["decision"]
     label, colour = OUTCOMES[decision["outcome"]]
     st.subheader("Recommendation")
     st.badge(label, color=colour)
-    st.markdown(decision["explanation"])
+    findings = decision.get("findings") or []
+    if findings:
+        st.markdown(OUTCOME_HEADLINES[decision["outcome"]])
+        _show_findings(findings)
+    else:
+        st.markdown(decision["explanation"])
     if decision["suggested_next_steps"]:
         st.markdown("**Suggested next steps**")
         st.markdown("\n".join(f"- {step}" for step in decision["suggested_next_steps"]))
@@ -78,6 +125,72 @@ def _show_decision(result: dict, *, show_reference_hint: bool = True) -> None:
         )
     if result["previous_application_exists"]:
         st.info("A previous application exists for this Emirates ID.")
+
+
+def _pretty(name: str) -> str:
+    text = name.removesuffix("_aed").replace("_", " ").capitalize()
+    return f"{text} (AED)" if name.endswith("_aed") else text
+
+
+def _show_checks_and_documents(result: dict) -> None:
+    checks = result.get("cross_checks") or []
+    if checks:
+        st.markdown("**Cross-document checks**")
+        st.table(
+            [
+                {
+                    "Check": CHECK_LABELS.get(c["check_id"], c["check_id"]),
+                    "Result": CHECK_MARKS[c["passed"]],
+                    "Form": c["form_value"],
+                    "Document": c["document_value"],
+                }
+                for c in checks
+            ]
+        )
+    documents = result.get("documents") or []
+    if documents:
+        st.markdown("**What we read from your documents**")
+    for document in documents:
+        mark = "✅" if document["ok"] else "❌"
+        with st.expander(f"{mark} {document['label']}"):
+            if document["error"]:
+                st.error(f"Could not be read: {document['error']}")
+            rows = [{"Field": _pretty(k), "Value": v} for k, v in document["fields"].items()]
+            rows += [
+                {"Field": _pretty(k), "Value": ", ".join(v)}
+                for k, v in document["items"].items()
+                if v
+            ]
+            if rows:
+                st.table(rows)
+
+
+def _show_enablement(result: dict) -> None:
+    """US4: the plan comes from the local LLM after the decision is already on screen."""
+    state = st.session_state
+    st.subheader("Economic enablement plan")
+    if state.get("enablement") is None and state.get("enablement_failure") is None:
+        with st.spinner("Preparing your economic enablement plan with the local AI model…"):
+            try:
+                state.enablement = get_client().enablement(
+                    result["reference_number"], state.get("apply_emirates_id", "")
+                )
+            except ApiError as exc:
+                state.enablement_failure = exc.detail
+    if state.get("enablement_failure"):
+        st.warning(f"The enablement plan is not available: {state.enablement_failure}")
+        return
+    plan = state.enablement
+    if plan["is_fallback"]:
+        st.caption("General guidance (the local AI model was unavailable).")
+    else:
+        st.caption(f"Personalised by the local model {plan['model']} from your resume and profile.")
+    st.markdown("**Training and upskilling**")
+    st.markdown("\n".join(f"- {item}" for item in plan["training"]))
+    st.markdown("**Job matches**")
+    st.markdown("\n".join(f"- {item}" for item in plan["job_matches"]))
+    st.markdown("**Career counselling**")
+    st.markdown(plan["career_counselling"])
 
 
 def render_apply(client: ApiClient) -> None:
@@ -106,12 +219,24 @@ def render_apply(client: ApiClient) -> None:
             key="employment_status",
         )
         _field_error("employment_status")
-        st.form_submit_button("Submit application", on_click=_submit_application)
+        st.markdown("**Documents** (all five are required)")
+        for field, label, types in DOCUMENTS:
+            st.file_uploader(label, type=types, key=f"upload_{field}")
+            _field_error(field)
+        st.form_submit_button("Submit application", on_click=_request_submit)
 
+    if st.session_state.get("submit_pending"):
+        st.session_state.submit_pending = False
+        with st.spinner("Reading your documents and assessing your application…"):
+            _submit_application()
+        st.rerun()  # so field errors render inside the form above
     if st.session_state.get("apply_failure"):
         st.error(st.session_state.apply_failure)
-    if st.session_state.get("apply_result"):
-        _show_decision(st.session_state.apply_result)
+    result = st.session_state.get("apply_result")
+    if result:
+        _show_decision(result)
+        _show_checks_and_documents(result)
+        _show_enablement(result)
 
 
 def render_lookup(client: ApiClient) -> None:
@@ -181,6 +306,10 @@ def render_review(client: ApiClient) -> None:
             for item in items
         ]
     )
+    for item in items:
+        if item.get("reasons"):
+            with st.expander(f"Reasons for {item['reference_number']}"):
+                st.markdown("\n".join(f"- {reason}" for reason in item["reasons"]))
 
 
 def main() -> None:

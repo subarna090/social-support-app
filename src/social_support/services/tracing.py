@@ -24,6 +24,11 @@ ALLOWED_EXTRA_KEYS = (
     "fields",  # names of fields that failed validation, never their values
     "run_id",  # synthetic generator (feature 002): run and pack identifiers, never personal data
     "pack_id",
+    "document_type",  # feature 004: document types, check ids and model metadata, never values
+    "check_id",
+    "model",
+    "is_fallback",
+    "latency_ms",
 )
 
 

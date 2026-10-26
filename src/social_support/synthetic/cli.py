@@ -10,6 +10,7 @@ from pathlib import Path
 
 from social_support.domain.models import Outcome
 from social_support.services.tracing import configure_logging
+from social_support.synthetic.demo import DemoExistsError, write_demo
 from social_support.synthetic.profile import SamplingError
 from social_support.synthetic.run import (
     INCONSISTENCY_TYPES,
@@ -65,6 +66,10 @@ def build_parser() -> argparse.ArgumentParser:
     seed.add_argument("--run", type=Path, required=True)
     seed.add_argument("--limit", type=int, default=None)
     seed.add_argument("--api-base-url", default=None)
+
+    demo = commands.add_parser("demo", help="write the three fixed demo applicants (feature 004)")
+    demo.add_argument("--out", type=Path, default=Path("data/demo"))
+    demo.add_argument("--force", action="store_true")
     return parser
 
 
@@ -111,6 +116,18 @@ def _seed(args: argparse.Namespace) -> int:
     return 0
 
 
+def _demo(args: argparse.Namespace) -> int:
+    try:
+        written = write_demo(args.out, force=args.force)
+    except DemoExistsError as exc:
+        print(f"social-support-data: {exc}", file=sys.stderr)
+        return 2
+    for name, expected, _form in written:
+        folder = args.out / name
+        print(f"{folder}  expected {expected.value}  (form values: {folder / 'form.json'})")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     configure_logging()  # JSON records on stderr; per-pack records are DEBUG, so hidden by default
     try:
@@ -119,6 +136,8 @@ def main(argv: list[str] | None = None) -> int:
             return _generate(args)
         if args.command == "seed":
             return _seed(args)
+        if args.command == "demo":
+            return _demo(args)
     except RequestError as exc:
         print(f"social-support-data: error: {exc}", file=sys.stderr)
         return 2

@@ -1,25 +1,48 @@
 """HTTP routes for API v1 (contracts/api.md)."""
 
 import secrets
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from social_support.api.schemas import (
     ApplicationOut,
+    CrossCheckOut,
     DecisionOut,
+    DocumentOut,
+    DocumentSubmissionResponse,
+    EnablementOut,
+    EnablementRequest,
     LookupRequest,
     LookupResponse,
     ReviewQueueItem,
     ReviewQueueResponse,
     SubmitApplicationRequest,
     SubmitApplicationResponse,
+    SubmitWithDocumentsForm,
     iso_utc,
     money,
 )
+from social_support.domain.documents import DocumentType
 from social_support.persistence.db import get_session
 from social_support.persistence.repository import ApplicationRepository
-from social_support.services.applications import ApplicationService, Submission
+from social_support.services.applications import (
+    ApplicationService,
+    DocumentSettings,
+    Submission,
+)
+from social_support.services.uploads import Upload
 
 router = APIRouter()
 
@@ -28,7 +51,19 @@ ACCESS_DENIED_DETAIL = "Access denied."
 
 
 def get_service(request: Request, session: Session = Depends(get_session)) -> ApplicationService:
-    return ApplicationService(ApplicationRepository(session), request.app.state.assessor)
+    state = request.app.state
+    settings = state.settings
+    return ApplicationService(
+        ApplicationRepository(session),
+        state.assessor,
+        case_assessor=state.case_assessor,
+        document_settings=DocumentSettings(
+            upload_dir=settings.upload_dir,
+            income_tolerance_pct=settings.income_tolerance_pct,
+            ocr_min_confidence=settings.ocr_min_confidence,
+        ),
+        advisor=state.advisor,
+    )
 
 
 def require_caseworker(
@@ -50,6 +85,7 @@ def health(request: Request) -> dict:
         "status": "ok",
         "assessor": request.app.state.settings.assessor,
         "rule_version": assessor.rule_version.id,
+        "enablement_model": request.app.state.settings.enablement_model,
     }
 
 
@@ -67,6 +103,42 @@ def submit_application(
         submitted_at=iso_utc(result.submitted_at),
         previous_application_exists=result.previous_application_exists,
         decision=DecisionOut.from_assessment(result.assessment, result.decided_at),
+    )
+
+
+@router.post(
+    "/applications/with-documents",
+    status_code=status.HTTP_201_CREATED,
+    response_model=DocumentSubmissionResponse,
+)
+def submit_with_documents(
+    body: Annotated[SubmitWithDocumentsForm, Form()],
+    bank_statement: Annotated[UploadFile, File()],
+    emirates_id_card: Annotated[UploadFile, File()],
+    resume: Annotated[UploadFile, File()],
+    assets_liabilities: Annotated[UploadFile, File()],
+    credit_report: Annotated[UploadFile, File()],
+    service: ApplicationService = Depends(get_service),
+) -> DocumentSubmissionResponse:
+    """Feature 004: the form plus five documents. An unreadable document is not an error here:
+    it routes the case to human review (spec edge cases)."""
+    files = {
+        DocumentType.BANK_STATEMENT: bank_statement,
+        DocumentType.EMIRATES_ID_CARD: emirates_id_card,
+        DocumentType.RESUME: resume,
+        DocumentType.ASSETS_LIABILITIES: assets_liabilities,
+        DocumentType.CREDIT_REPORT: credit_report,
+    }
+    uploads = [Upload(t, f.filename or "", f.file.read()) for t, f in files.items()]
+    outcome = service.submit_with_documents(Submission(**body.model_dump()), uploads)
+    result = outcome.result
+    return DocumentSubmissionResponse(
+        reference_number=result.reference_number,
+        submitted_at=iso_utc(result.submitted_at),
+        previous_application_exists=result.previous_application_exists,
+        decision=DecisionOut.from_assessment(result.assessment, result.decided_at, result.findings),
+        documents=[DocumentOut.from_document(d) for d in outcome.documents.values()],
+        cross_checks=[CrossCheckOut.from_result(c) for c in outcome.cross_checks],
     )
 
 
@@ -89,7 +161,29 @@ def lookup_application(
             net_monthly_income_aed=money(submission.net_monthly_income_aed),
             employment_status=submission.employment_status.value,
         ),
-        decision=DecisionOut.from_assessment(result.assessment, result.decided_at),
+        decision=DecisionOut.from_assessment(result.assessment, result.decided_at, result.findings),
+    )
+
+
+@router.post("/applications/{reference_number}/enablement", response_model=EnablementOut)
+def enablement(
+    reference_number: str,
+    body: EnablementRequest,
+    service: ApplicationService = Depends(get_service),
+) -> EnablementOut:
+    """US4: economic enablement recommendations from the local LLM (or the labelled fallback).
+    A missing reference and a mismatched Emirates ID get the same 404 as lookup."""
+    found = service.enablement_for(reference_number, body.emirates_id)
+    if found is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=NOT_FOUND_DETAIL)
+    plan = found.plan
+    return EnablementOut(
+        training=list(plan.training),
+        job_matches=list(plan.job_matches),
+        career_counselling=plan.career_counselling,
+        is_fallback=plan.is_fallback,
+        model=plan.model,
+        created_at=iso_utc(found.created_at),
     )
 
 
@@ -106,6 +200,7 @@ def review_queue(service: ApplicationService = Depends(get_service)) -> ReviewQu
                 full_name=item.full_name,
                 submitted_at=iso_utc(item.submitted_at),
                 flag_reason=item.flag_reason,
+                reasons=list(item.reasons),
             )
             for item in service.review_queue()
         ]

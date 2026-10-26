@@ -69,3 +69,23 @@ class ApiClient:
     def lookup(self, reference_number: str, emirates_id: str) -> dict:
         body = {"reference_number": reference_number, "emirates_id": emirates_id}
         return self._request("POST", "/api/v1/applications/lookup", json=body)
+
+    # --- feature 004 -------------------------------------------------------------------------
+
+    def submit_with_documents(self, payload: dict, files: dict) -> dict:
+        """``files`` maps an upload field to ``(filename, bytes, content type)``. OCR and parsing
+        take a few seconds, so this call waits longer than the others."""
+        data = {key: str(value) for key, value in payload.items()}
+        return self._request(
+            "POST", "/api/v1/applications/with-documents", data=data, files=files, timeout=120.0
+        )
+
+    def enablement(self, reference_number: str, emirates_id: str) -> dict:
+        """The local LLM can take a minute or more on CPU; the API falls back after its own
+        timeout, so this one is longer."""
+        return self._request(
+            "POST",
+            f"/api/v1/applications/{reference_number}/enablement",
+            json={"emirates_id": emirates_id},
+            timeout=150.0,
+        )

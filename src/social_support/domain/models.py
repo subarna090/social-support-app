@@ -28,9 +28,12 @@ class EmploymentStatus(StrEnum):
 class TraceStep(StrEnum):
     RECEIVED = "RECEIVED"
     VALIDATED = "VALIDATED"
+    EXTRACTED = "EXTRACTED"
+    CROSS_CHECKED = "CROSS_CHECKED"
     ASSESSED = "ASSESSED"
     STORED = "STORED"
     RESULT_RETURNED = "RESULT_RETURNED"
+    ENABLEMENT = "ENABLEMENT"
 
 
 class TraceStatus(StrEnum):

@@ -35,6 +35,7 @@ def test_201_has_exactly_the_documented_shape(client):
         "flag_reason",
         "rule_version",
         "decided_at",
+        "findings",  # feature 004: always present, empty for the placeholder rule
     }
     assert body["decision"]["outcome"] == "APPROVE"
     assert body["decision"]["income_per_member_aed"] == "1500.00"

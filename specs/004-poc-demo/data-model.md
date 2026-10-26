@@ -38,7 +38,7 @@ Fields per type (required ones in **bold**):
 | sources | tuple[DocumentType, ...] |
 | message | str |
 
-Names are compared case-insensitively, with whitespace collapsed. Emirates IDs are compared as
+Names are compared case-insensitively, with all whitespace removed (OCR can drop spaces). Emirates IDs are compared as
 digits only. Income passes when `|declared − bank| ≤ tolerance% × bank`.
 
 ### Finding

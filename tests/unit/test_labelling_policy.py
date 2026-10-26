@@ -184,3 +184,58 @@ def test_invalid_policy_files_are_rejected(tmp_path, body, message):
     path.write_text(HEADER + body, encoding="utf-8")
     with pytest.raises(PolicyError, match=re.escape(message)):
         load_policy(path=path)
+
+
+# --- feature 004: evaluate_all (research R5) --------------------------------------------------
+
+ALL_RULES_POLICY = """
+name = "findings"
+version = "t1"
+description = "test"
+
+[[rules]]
+id = "low_income"
+outcome = "APPROVE"
+reason = "Income per member {income_per_member_aed} is low."
+conditions = [{ factor = "income_per_member_aed", op = "lt", value = 2000 }]
+
+[[rules]]
+id = "good_credit"
+outcome = "APPROVE"
+reason = "Score {credit_score}."
+conditions = [{ factor = "credit_score", op = "ge", value = 550 }]
+
+[[rules]]
+id = "rich"
+outcome = "SOFT_DECLINE"
+reason = "Net wealth {net_wealth_aed}."
+conditions = [{ factor = "net_wealth_aed", op = "gt", value = 500000 }]
+
+[[rules]]
+id = "default"
+outcome = "APPROVE"
+reason = "No findings."
+conditions = []
+"""
+
+
+@pytest.fixture
+def all_rules_policy(tmp_path):
+    path = tmp_path / "findings_t1.toml"
+    path.write_text(ALL_RULES_POLICY, encoding="utf-8")
+    return load_policy(path=path)
+
+
+def test_evaluate_all_returns_every_matching_rule_in_file_order(all_rules_policy):
+    results = all_rules_policy.evaluate_all(facts(total_assets_aed=Decimal("600000.00")))
+    assert [r.rule_id for r in results] == ["low_income", "good_credit", "rich"]
+    assert results[2].outcome is Outcome.SOFT_DECLINE
+    assert results[2].reason == "Net wealth 600000.00."
+    assert {r.policy_version_id for r in results} == {all_rules_policy.version_id}
+
+
+def test_evaluate_all_never_reports_the_default_rule(all_rules_policy):
+    results = all_rules_policy.evaluate_all(
+        facts(net_monthly_income_aed=Decimal("5000.00"), credit_score=500)
+    )
+    assert results == []
